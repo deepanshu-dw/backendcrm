@@ -1,0 +1,604 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\ServiceModel;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
+
+class ServiceController extends Controller
+{
+  //
+  public function addService(Request $request)
+  {
+    $Validator = Validator::make($request->all(), [
+      'service_name_en' => 'required',
+      'service_name_es' => 'required',
+      'service_name_pl' => 'required',
+      //  'price_en'=>'required',
+      //  'price_es'=>'required',
+      //  'price_pl'=>'required',
+      'service_time_taken' => 'required',
+    //   'group_id' => 'required'
+    ]);
+    if ($Validator->fails()) {
+      return response()->json(['result' => 0, 'errors' => $Validator->errors()->first()]);
+    }
+
+	$admin_id = $request->input('admin_id');
+
+    $insert = [
+      'service_name_en' => $request->post('service_name_en'),
+      'service_name_es' => $request->post('service_name_es'),
+      'service_name_pl' => $request->post('service_name_pl'),
+      'price_en' => $request->post('price_en'),
+      'price_es' => $request->post('price_es'),
+      'price_pl' => $request->post('price_pl'),
+      'service_time_taken' => $request->post('service_time_taken'),
+      'group_id' => $request->post('group_id'),
+      'is_sub_service'=>$request->post('is_sub_service'),
+      'is_hair_extension'=>$request->post('is_hair_extension'),
+      'hair_gm'=>$request->post('hair_gm'),
+      'hair_per_unit'=> $request->post('hair_per_unit'),
+      'hair_gm_pln'=> $request->post('hair_gm_pln'),
+      'hair_gm_dl'=> $request->post('hair_gm_dl'),
+      'hair_gm_eu'=> $request->post('hair_gm_eu'),
+	  'is_archived'=>$request->post('is_archived')
+    ];
+
+    $result = ServiceModel::addService($insert);
+
+    if ($result) {
+		DB::table('activity_logs')->insert([
+			'admin_id'   => $admin_id,
+			'action'     => 'Service Added',
+			'description'=> "New Service created: {$insert['service_name_en']}",
+			'created_at' => now(),
+		]);
+      return response()->json(['result' => 1, 'msg' => 'Service Added Successfully', 'data' => $result]);
+    } else {
+      return response()->json(['result' => -1, 'msg' => 'Service Not Added ']);
+    }
+  }
+
+	public function getAllServices(Request $request, $lang)
+	{
+		$user = !empty($request->query('u')) ? $request->query('u') : null;
+		$user_id = !empty($request->query('uid')) ? $request->query('uid') : null;
+		$is_admin = $request->input('is_admin', "true");
+		$keyword = $request->query('keyword');
+		$result=ServiceModel::getAllServices($lang, $is_admin, $user, $user_id, $keyword);
+		if ($result) {
+			foreach ($result as $row) {
+				$row->subservices = ServiceModel::getSubserviceByServiceId($row->service_id);
+			}
+			return response()->json(['result'=> 1,'msg' => 'Data Found','data'=>$result]);
+		}else{
+			return response()->json(['result'=> -1,'msg' => ' No data Found']);
+		}
+	}
+
+	public function getServiceDetail($lang=null, $service_id)
+	{
+		$result = ServiceModel::getServiceDetail($lang, $service_id);
+
+		if ($result) {
+			$result->subservices = ServiceModel::getSubserviceByServiceId($result->service_id);
+
+			return response()->json(['result' => 1, 'msg' => 'Data found', 'data' => $result]);
+		} else {
+			return response()->json(['result' => -1, 'msg' => 'No data Found']);
+		}
+	}
+
+	public function updateService(Request $request, $service_id)
+	{
+	  $Validator = Validator::make($request->all(), [
+		'service_name_en' => 'required',
+		'service_name_es' => 'required',
+		'service_name_pl' => 'required',
+		//  'price_en'=>'required',
+		//  'price_es'=>'required',
+		//  'price_pl'=>'required',
+		'service_time_taken' => 'required',
+	   // 'group_id' => 'required'
+	  ]);
+	  if ($Validator->fails()) {
+		return response()->json(['result' => 0, 'errors' => $Validator->errors()->first()]);
+	  }
+  
+	  $admin_id = $request->post('admin_id');
+  
+	  $update = [
+		'service_name_en' => $request->post('service_name_en'),
+		'service_name_es' => $request->post('service_name_es'),
+		'service_name_pl' => $request->post('service_name_pl'),
+		'price_en' => $request->post('price_en'),
+		'price_es' => $request->post('price_es'),
+		'price_pl' => $request->post('price_pl'),
+		'service_time_taken' => $request->post('service_time_taken'),
+		'group_id' => $request->post('group_id'),
+		'is_hair_extension'=>$request->post('is_hair_extension'),
+		'hair_gm'=>$request->post('hair_gm'),
+		'hair_per_unit'=> $request->post('hair_per_unit'),
+		'hair_gm_pln'=> $request->post('hair_gm_pln'),
+		'hair_gm_dl'=> $request->post('hair_gm_dl'),
+		'hair_gm_eu'=> $request->post('hair_gm_eu'),
+		'is_archived'=>$request->post('is_archived')
+	  ];
+  
+	  $result = ServiceModel::updateService($update, $service_id);
+  
+	  if ($result) {
+		  DB::table('activity_logs')->insert([
+			  'admin_id'   => $admin_id,
+			  'action'     => 'Service Added',
+			  'description'=> "New Service created: {$update['service_name_en']}",
+			  'created_at' => now(),
+		  ]);
+		return response()->json(['result' => 1, 'msg' => 'Service Updated Successfully', 'data' => $result]);
+	  } else {
+		return response()->json(['result' => -1, 'msg' => 'No Changes Updated']);
+	  }
+	}
+	
+	public function deleteService(Request $request,$service_id)
+	{
+		$admin_id = $request->post('admin_id');
+		$service = DB::table('services')->where('service_id', $service_id)->first();
+		if (!$service) {
+            return response()->json(['result' => -1, 'msg' => 'Service not found']);
+        }
+		$result = ServiceModel::deleteService($service_id);
+		if ($result) {
+
+			DB::table('activity_logs')->insert([
+                'admin_id'   => $admin_id,
+                'action'     => 'Deleted Service',
+                'description'=> "Deleted Service: {$service->service_name_en} (ID: {$service->service_id})",
+                'created_at' => now(),
+            ]);
+
+			$subservices = ServiceModel::getSubserviceByServiceId($service_id);
+
+			if ($subservices) {
+				ServiceModel::deleteSubservicesByServiceId($service_id);
+				
+			}
+
+			return response()->json(['result' => 1, 'msg' => 'Services Deleted Successfully']);
+		} else {
+			return response()->json(['result' => -1, 'msg' => 'Try Again later']);
+		}
+	}
+   // ---------------------------Payment History Apis ---------------------------------------------------------------
+   public function getAllPaymentHistory()
+   {
+      $result=ServiceModel::getAllPaymentHistory();
+      // dd($result);
+      if($result){
+        return response()->json(['result' => 1, 'msg' => 'Payment History', 'data'=>$result]);
+      }else{
+        return response()->json(['result' => -1, 'msg' => 'No Payment History']);
+      }
+         
+   }  
+   
+   public function addPayment(Request $request)
+   {
+       try {
+			$validator = Validator::make($request->all(), [
+				'customer_id' => 'required',
+				'salon_id' => 'required',
+				'service_id' => 'required',
+				'payment_method' => 'required|in:cash,credit,debit,wallet',
+			]);
+
+			if ($validator->fails()) {
+				return response()->json(['result' => 0, 'errors' => $validator->errors()->first()]);
+			}
+			
+			$booking_id = $request->input('booking_id');
+
+			$insert = [
+				'booking_id' => !empty($booking_id) ? $booking_id : null,
+				'customer_id' => $request->input('customer_id'),
+				'salon_id' => $request->input('salon_id'),
+				'service_id' => json_encode($request->input('service_id')),
+				'amount' => $request->input('total_amount'),
+				'payment_date' => $request->input('payment_date'),
+				'payment_method' => $request->input('payment_method')
+			];
+
+			$result = ServiceModel::addPayment($insert);
+
+			if ($result) {
+				$pre_payment_amt = $request->input('prepaid_amount');
+				if (!empty($pre_payment_amt)) {
+					update('booking', 'booking_id', $booking_id, ['pre_payment_amt' => $pre_payment_amt, 'pre_payment_made' => 'yes']);
+				}
+				
+				$services = $request->input('services');
+				$serviceIds = [];
+				if (!empty($services)) {
+					foreach ($services as $service) {
+						$serviceIds[] = $service['service_id'];
+						$pricingData = [
+							'booking_id' => !empty($booking_id) ? $booking_id : null,
+							'service_id' => !empty($service['service_id']) ? $service['service_id'] : null,
+							'total_amount' => !empty($service['total_amount']) ? $service['total_amount'] : null,
+							'hair_gm' => !empty($service['hair_gm']) ? $service['hair_gm'] : null,
+							'price_per_unit' => !empty($service['price_per_unit']) ? $service['price_per_unit'] : null
+						];
+						insert('booking_pricing', $pricingData);
+					}
+					
+					if (!empty($serviceIds)) {
+						/* return response()->json(['result' => 1, 'serviceIds' => $serviceIds]); */
+						$booking_details = select('booking', 'services', [['status', '=', 'Active'], ['booking_id', '=', $booking_id]])->first();
+						if (!empty($booking_details)) {
+							update('booking', 'booking_id', $booking_id, ['old_services' => $booking_details->services]);
+						}
+						$serviceIdsString = json_encode($serviceIds);
+						update('booking', 'booking_id', $booking_id, ['services' => $serviceIdsString]);
+					}
+				}
+				
+				return response()->json(['result' => 1, 'msg' => 'Payment Added Successfully', 'data' => $result, 'services' => !empty($services) ? $services : null]);
+			} else {
+				return response()->json(['result' => -1, 'msg' => 'Try Again Later']);
+			}
+		} catch (\Exception $e) {
+			return response()->json(['result' => -1, 'msg' => 'An error occurred: ' . $e->getMessage()]);
+		}      
+   }
+   
+    public function getPaymentHistoryBySalonId($salon_id)
+    {
+       $result=ServiceModel::getPaymentHistoryBySalonId($salon_id);
+       if($result){
+        foreach($result as $row){
+            
+          $row->salons = SalonModel::getSalonDetails($row->salon_id);
+
+          $services = str_replace(['\\', '/'], '',$row->service_id);
+       
+          $row->services =ServiceModel::getServices(json_decode($services));
+        }
+        return response()->json(['result' => 1, 'msg' => 'Payment History', 'data' => $result]);
+       }else{
+        return response()->json(['result' => -1, 'msg' => 'No Payment History']);
+       }
+    }
+
+    public function getPaymentHistoryByCustomerId($customer_id)
+    {
+       $result=ServiceModel::getPaymentHistoryByCustomerId($customer_id);
+       if($result){
+        foreach($result as $row){
+            
+          $row->Customer = CustomerModel::getCustomerById($row->customer_id);
+
+          $services = str_replace(['\\', '/'], '',$row->service_id);
+       
+          $row->services =ServiceModel::getServices(json_decode($services));
+        }
+        return response()->json(['result' => 1, 'msg' => 'Payment History', 'data' => $result]);
+       }else{
+        return response()->json(['result' => -1, 'msg' => 'No Payment History']);
+       }
+    }
+	
+	public function getSalonStats(Request $request, $salon_id, ServiceModel $serviceModel)
+    {
+        try {
+			$result = [
+				'todayCollection' => $serviceModel->getCollectionByPeriod($salon_id, 'today'),
+				'weeklyCollection' => $serviceModel->getCollectionByPeriod($salon_id, 'week'),
+				'monthlyCollection' => $serviceModel->getCollectionByPeriod($salon_id, 'month'),
+				'yearlyCollection' => $serviceModel->getCollectionByPeriod($salon_id, 'year'),
+				'totalClients' => $serviceModel->getTotalClients($salon_id),
+				'totalEmployeesWorking' => $serviceModel->getTotalEmployeesWorking($salon_id),
+				'todaysBooking' => $serviceModel->getTodayBooking($salon_id, 'today'),
+			    'totalBookings' => $serviceModel->getTotalBookings($salon_id)
+			];
+    
+            if ($result) {
+				return response()->json(['result' => 1, 'msg' => 'Records found', 'data' => $result]);
+			} else {
+				return response()->json(['result' => -1, 'msg' => 'No Records found']);
+			}
+        } catch (\Exception $e) {
+            Log::error('Error in getSalonStats: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['error' => 'Internal Server Error', 'details' => $e->getMessage()], 500);
+        }
+    }
+	
+	// --------------------------------------SUB-SERVICES----------------------------------------------------------
+    public function addSubServices(Request $request)
+    {
+        $Validator = Validator::make($request->all(), [
+            'service_id' => 'required',
+            'name_en' => 'required',
+        ]);
+
+        if ($Validator->fails()) {
+            return response()->json(['result' => 0, 'errors' => $Validator->errors()->first()]);
+        }
+
+        $subServiceInsert = [
+            'service_id' => $request->post('service_id'),
+            'name_en' => $request->post('name_en'),
+            'name_es' => $request->post('name_es'),
+            'name_pl' => $request->post('name_pl'),
+            'hair_per_unit' => $request->post('hair_per_unit'),
+            'hair_gm' => $request->post('hair_gm'),
+            'price'=>$request->post('price')
+        ];
+        // dd($subServiceInsert);
+        $result = ServiceModel::addSubService($subServiceInsert);
+
+        if ($result) {
+            return response()->json(['result' => 1, 'msg' => 'Sub-service Added Succesfully']);
+        } else {
+            return response()->json(['result' => -1, 'msg' => 'Sub-Services Not Added']);
+        }
+    }
+
+    public function updateSubServices(Request $request, $id)
+    {
+        $Validator = Validator::make($request->all(), [
+            'service_id' => 'required',
+            'name_en' => 'required',
+        ]);
+
+        if ($Validator->fails()) {
+            return response()->json(['result' => 0, 'errors' => $Validator->errors()->first()]);
+        }
+        $update = [
+            'service_id' => $request->post('service_id'),
+            'name_en' => $request->post('name_en'),
+            'name_es' => $request->post('name_es'),
+            'name_pl' => $request->post('name_pl'),
+            'hair_per_unit' => $request->post('hair_per_unit'),
+            'hair_gm' => $request->post('hair_gm'),
+            'price' =>$request->post('price')
+        ];
+
+        $result = ServiceModel::updateSubServices($update, $id);
+
+        if ($result) {
+            return response()->json(['result' => 1, 'msg' => 'Sub-service Updated Succesfully']);
+        } else {
+            return response()->json(['result' => -1, 'msg' => 'No Changes Updated']);
+        }
+    }
+
+    public function getSubServicesById($id = null)
+    {
+        $result = ServiceModel::getSubServicesById($id);
+
+        if ($result) {
+            return response()->json(['result' => 1, 'msg' => 'Data Found', 'data' => $result]);
+        } else {
+            return response()->json(['result' => -1, 'msg' => 'Data Not Found']);
+        }
+    }
+
+    public function subServices()
+    {
+        $result = ServiceModel::getsubServices();
+        if ($result) {
+            return response()->json(['result' => 1, 'msg' => 'Data Found', 'data' => $result]);
+        } else {
+            return response()->json(['result' => -1, 'msg' => 'No Data']);
+        }
+    }
+    
+    public function deleteSubService($id)
+    {
+        $result=ServiceModel::deleteSubService($id);
+        if($result){
+            return response()->json(['result'=>1,'msg'=>'Sub-Services Deleted Successfully']);
+        }else{
+            return response()->json(['result'=>-1,'msg'=>'Sub-services Not Deleted']);
+        }
+    }
+
+    public function getAllSalonStats(Request $request, ServiceModel $serviceModel)
+    {
+        try {
+            $todayCollection = $serviceModel->getAllSalonsCollection('today');
+            $weeklyCollection = $serviceModel->getAllSalonsCollection('week');
+            $monthlyCollection = $serviceModel->getAllSalonsCollection('month');
+            $yearlyCollection = $serviceModel->getAllSalonsCollection('year');
+            $totalClients = $serviceModel->getAllSalonsClients();
+            $totalEmployeesWorking = $serviceModel->getAllSalonsEmployeesWorking();
+            $todaysBooking = $serviceModel->getAllSalonsBooking('today');
+            $monthlyBookings = $serviceModel->getAllSalonsBooking('month');
+            $yearlyBookings = $serviceModel->getAllSalonsBooking('year');
+            $weeklyBookings = $serviceModel->getAllSalonsBooking('week');
+
+            $result = [
+                'todaysCollection' => $todayCollection,
+                'weeklyCollection' => $weeklyCollection,
+                'monthlyCollection' => $monthlyCollection,
+                'yearlyCollection' => $yearlyCollection,
+                'totalClients' => $totalClients,
+                'totalEmployeesWorking' => $totalEmployeesWorking,
+                'weeklyBookings' => $weeklyBookings,
+                'monthlyBooking'=> $monthlyBookings,
+                'yearlyBooking'=> $yearlyBookings,
+                'todaysBooking' => $todaysBooking,
+            ];
+            // dd($result);
+            if ($result) {
+                return response()->json(['result' => 1, 'msg' => 'Data Found', 'data' => $result]);
+            } else {
+                return response()->json(['result' => -1, 'msg' => 'No Data Found']);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error in getSalonStats: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['error' => 'Internal Server Error', 'details' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getSalonStatisticsOld(Request $request, ServiceModel $serviceModel)
+    {
+		try {
+			$user = !empty($request->query('u')) ? $request->query('u') : null;
+			$user_id = !empty($request->query('uid')) ? $request->query('uid') : null;
+			$allSalons = $serviceModel->getAllSalonDetails($user, $user_id);
+			$salonStats = [];
+
+			foreach ($allSalons as $salon) {
+				$salonName = $salon->salon_name_en ?? $salon->salon_name_es ?? $salon->salon_name_pl ?? null;
+
+				$todaysCollection = $serviceModel->getCollectionByPeriod($salon->salon_id, 'today');
+				$monthlyCollection = $serviceModel->getCollectionByPeriod($salon->salon_id, 'month');
+				$weeklyCollection = $serviceModel->getCollectionByPeriod($salon->salon_id, 'week');
+				$yearlyCollection = $serviceModel->getCollectionByPeriod($salon->salon_id, 'year');
+				
+				$todaysBooking = $serviceModel->getBookingDetails($salon->salon_id, 'today');
+				$weeklyBooking = $serviceModel->getBookingDetails($salon->salon_id, 'week');
+				$monthlyBooking = $serviceModel->getBookingDetails($salon->salon_id, 'month');
+				$yearlyBooking = $serviceModel->getBookingDetails($salon->salon_id, 'year');
+
+				$todayClients = $serviceModel->getClientDetails($salon->salon_id, 'today');
+				$weeklyClients = $serviceModel->getClientDetails($salon->salon_id, 'week');
+				$monthlyClients = $serviceModel->getClientDetails($salon->salon_id, 'month');
+				$yearlyClients = $serviceModel->getClientDetails($salon->salon_id, 'year');
+				
+				$todayRevenue = $serviceModel->getBookingRevenue($salon->salon_id, 'today');
+				$weeklyRevenue = $serviceModel->getBookingRevenue($salon->salon_id, 'week');
+				$monthlyRevenue = $serviceModel->getBookingRevenue($salon->salon_id, 'month');
+				$yearlyRevenue = $serviceModel->getBookingRevenue($salon->salon_id, 'year');
+
+				$totalEmployeesWorking=$serviceModel->getTotalEmployeesWorking($salon->salon_id);
+				
+				$salonStats[] = [
+					'salon_id' => $salon->salon_id,
+					'salon_name' => $salonName,
+					'statistics' => [
+						'todaysCollection' => $todaysCollection,
+						'monthlyCollection' => $monthlyCollection,
+						'weeklyCollection' => $weeklyCollection,
+						'yearlyCollection' => $yearlyCollection,
+						'todaysBooking' => $todaysBooking,
+						'weeklyBooking' => $weeklyBooking,
+						'monthlyBooking' => $monthlyBooking,
+						'yearlyBooking' => $yearlyBooking,
+						'todayClients' => $todayClients,
+						'weeklyClients'=> $weeklyClients,
+						'monthlyClients'=> $monthlyClients,
+						'yearlyClients' => $yearlyClients,
+						'todayRevenue' => $todayRevenue,
+						'weeklyRevenue'=> $weeklyRevenue,
+						'monthlyRevenue'=> $monthlyRevenue,
+						'yearlyRevenue' => $yearlyRevenue,
+						'totalEmployeesWorking'=>$totalEmployeesWorking
+					],
+				];
+			}
+
+			if ($salonStats) {
+				return response()->json(['result' => 1, 'msg' => 'Salon statistics retrieved successfully', 'data' => $salonStats]);
+			} else {
+				return response()->json(['result' => -1, 'msg' => 'No salon statistics found']);
+			}
+		} catch (\Exception $e) {
+			// Handle exceptions, log or return an error response
+			return response()->json(['result' => -1, 'msg' => 'Error occurred: ' . $e->getMessage()]);
+		}
+	}
+
+	public function getSalonStatistics(Request $request, ServiceModel $serviceModel)
+	{
+		try {
+			$user = $request->query('u') ?? null;
+			$user_id = $request->query('uid') ?? null;
+			$allSalons = $serviceModel->getAllSalonDetails($user, $user_id);
+			$salonIds = $allSalons->pluck('salon_id')->toArray();
+			if (empty($salonIds)) {
+				return response()->json(['result' => -1, 'msg' => 'No salons found']);
+			}
+
+			$todaysCollection = $serviceModel->getCollectionByPeriodNew($salonIds, 'today');
+			$monthlyCollection = $serviceModel->getCollectionByPeriodNew($salonIds, 'month');
+			$weeklyCollection = $serviceModel->getCollectionByPeriodNew($salonIds, 'week');
+			$yearlyCollection = $serviceModel->getCollectionByPeriodNew($salonIds, 'year');
+			
+			$todaysBooking = $serviceModel->getBookingDetailsNew($salonIds, 'today');
+			$weeklyBooking = $serviceModel->getBookingDetailsNew($salonIds, 'week');
+			$monthlyBooking = $serviceModel->getBookingDetailsNew($salonIds, 'month');
+			$yearlyBooking = $serviceModel->getBookingDetailsNew($salonIds, 'year');
+
+			$todayClients = $serviceModel->getClientDetailsNew($salonIds, 'today');
+			$weeklyClients = $serviceModel->getClientDetailsNew($salonIds, 'week');
+			$monthlyClients = $serviceModel->getClientDetailsNew($salonIds, 'month');
+			$yearlyClients = $serviceModel->getClientDetailsNew($salonIds, 'year');
+			
+			$todayRevenue = $serviceModel->getBookingRevenueNew($salonIds, 'today');
+			$weeklyRevenue = $serviceModel->getBookingRevenueNew($salonIds, 'week');
+			$monthlyRevenue = $serviceModel->getBookingRevenueNew($salonIds, 'month');
+			$yearlyRevenue = $serviceModel->getBookingRevenueNew($salonIds, 'year');
+			
+			$totalEmployeesWorking=$serviceModel->getTotalEmployeesWorkingNew($salonIds);
+
+			$salonStats = [];
+			foreach ($allSalons as $salon) {
+				$salonStats[] = [
+					'salon_id' => $salon->salon_id,
+					'salon_name' => $salon->salon_name_en ?? $salon->salon_name_es ?? $salon->salon_name_pl ?? null,
+					'statistics' => [
+						'todaysCollection' => $todaysCollection[$salon->salon_id] ?? 0,
+						'monthlyCollection' => $monthlyCollection[$salon->salon_id] ?? 0,
+						'weeklyCollection' => $weeklyCollection[$salon->salon_id] ?? 0,
+						'yearlyCollection' => $yearlyCollection[$salon->salon_id] ?? 0,
+						'weeklyBooking' => $weeklyBooking[$salon->salon_id] ?? 0,
+						'todaysBooking' => $todaysBooking[$salon->salon_id] ?? 0,
+						'monthlyBooking' => $monthlyBooking[$salon->salon_id] ?? 0,
+						'yearlyBooking' => $yearlyBooking[$salon->salon_id] ?? 0,
+						'todayClients' => $todayClients[$salon->salon_id] ?? 0,
+						'weeklyClients'=> $weeklyClients[$salon->salon_id] ?? 0,
+						'monthlyClients'=> $monthlyClients[$salon->salon_id] ?? 0,
+						'yearlyClients' => $yearlyClients[$salon->salon_id] ?? 0,
+						'todayRevenue' => $todayRevenue[$salon->salon_id] ?? 0,
+						'weeklyRevenue'=> $weeklyRevenue[$salon->salon_id] ?? 0,
+						'monthlyRevenue'=> $monthlyRevenue[$salon->salon_id] ?? 0,
+						'yearlyRevenue' => $yearlyRevenue[$salon->salon_id] ?? 0,
+						'totalEmployeesWorking'=>$totalEmployeesWorking
+					],
+				];
+			}
+
+			return response()->json(['result' => 1, 'msg' => 'Salon statistics retrieved successfully', 'data' => $salonStats]);
+		} catch (\Exception $e) {
+			return response()->json(['result' => -1, 'msg' => 'Error occurred: ' . $e->getMessage()]);
+		}
+	}
+	
+	public function getSalonStatisticsV2(Request $request, ServiceModel $serviceModel)
+	{
+		try {
+			$user = $request->query('u') ?? null;
+			$user_id = $request->query('uid') ?? null;
+			$allSalons = $serviceModel->getAllSalonDetails($user, $user_id);
+			$salonIds = $allSalons->pluck('salon_id')->toArray();
+			if (empty($salonIds)) {
+				return response()->json(['result' => -1, 'msg' => 'No salons found']);
+			}
+			$salonStats = $serviceModel->getTopSalonsByBookings($salonIds);
+			if (!empty($salonStats)) {
+				foreach ($salonStats as $val) {
+					$val->salon_thumbnail = !empty($val->salon_thumbnail) ? baseURL($val->salon_thumbnail) : null;
+				}
+			}
+			return response()->json(['result' => 1, 'msg' => 'Salon statistics retrieved successfully', 'data' => $salonStats]);
+		} catch (\Exception $e) {
+			return response()->json(['result' => -1, 'msg' => 'Error occurred: ' . $e->getMessage()]);
+		}
+	}
+}
