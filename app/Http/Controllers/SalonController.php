@@ -253,7 +253,7 @@ class SalonController extends Controller
                  DB::table('activity_logs')->insert([
                 'admin_id'   => $admin_id,
                 'action'     => 'Salon Updated',
-                'description'=> "Salon Updated: {$insert['salon_name_en']}",
+                'description'=> "Salon Updated: {$update['salon_name_en']}",
                 'created_at' => now(),
 		        ]);
                 $services = $request->post('services_ids');
@@ -278,7 +278,7 @@ class SalonController extends Controller
     {
         $is_admin = $request->input('is_admin');
         $result = SalonModel::getSalonDetails($salon_id, $lang);
-
+        
         if ($lang == 0) {
             $lang = 'en';
         }
@@ -1185,7 +1185,7 @@ class SalonController extends Controller
 			$is_paginate = $request->query('is_paginate');
 			$user = $request->query('u');
 			$user_id = $request->query('uid');
-
+            
 			$salons_ids = SalonModel::getSalonByName($keyword)->pluck('salon_id')->toArray();
 			$worker_ids = SalonModel::getWorkerByName($keyword)->pluck('worker_id')->toArray();
 			$customer_ids = SalonModel::getPhoneByName($keyword)->pluck('customer_id')->toArray();
@@ -1963,6 +1963,26 @@ class SalonController extends Controller
             }
         } catch (\Exception $e) {
             return response()->json(['result' => -1, 'msg' => $e->getMessage()]);
+        }
+    }
+    
+    public function getCustomerBookingNotes(Request $request)
+    {
+        try{
+            $customer_id = $request->query('customer_id');
+            if (!$customer_id) {
+                return response()->json(['result' => -1,'msg' => 'customer_id is required' ]);
+            }
+
+            $result = SalonModel::getCustomerBookingNotes($customer_id);
+            if ($result->isNotEmpty()) {
+                return response()->json(['result' => 1,'msg' => 'Booking notes fetched successfully','data' => $result]);
+            } else {
+                return response()->json(['result' => 0,'msg' => 'No bookings found']);
+            }
+        } catch (\Exception $e) {
+            // Handle the exception
+            return response()->json(['result' => -1, 'msg' => 'An error occurred: ' . $e->getMessage()]);
         }
     }
 }

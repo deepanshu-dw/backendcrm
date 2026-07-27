@@ -194,7 +194,7 @@ class SalonModel extends Model
 
             $query = DB::table('services')
                 // ->select('*')
-                ->select('service_id', "service_name_$lang as service_name", "price_$lang as price", 'service_time_taken', 'is_hair_extension', 'hair_gm', 'hair_per_unit', 'hair_gm_pln', 'hair_gm_dl', 'hair_gm_eu', 'is_archived')
+                ->select('service_id', "service_name_$lang as service_name", "service_description_$lang as description", "price_$lang as price", 'service_time_taken', 'is_hair_extension', 'hair_gm', 'hair_per_unit', 'hair_gm_pln', 'hair_gm_dl', 'hair_gm_eu', 'is_archived','service_thumbnail')
                 ->whereIn('service_id', $service_id);
             // ->where('status', '!=', 'deleted');
             if ($is_admin == "false") {
@@ -379,6 +379,7 @@ class SalonModel extends Model
 			->select(
 				'booking.booking_id',
 				'booking.booking_status',
+                'booking.contact_no',
 				'booking.booking_date',
 				'booking.booking_for',
 				'booking.created_at',
@@ -406,7 +407,7 @@ class SalonModel extends Model
 			)
 			->where('booking.status', 'Active');
 
-		if (($user == 'subadmin') && ($user_id)) {
+            if (($user == 'subadmin') && ($user_id)) {
 			$manager = DB::table('admins')
 				->where('status', 'Active')
 				->where('admin_id', $user_id)
@@ -420,25 +421,26 @@ class SalonModel extends Model
 			}
 		}
 
-		if (!empty($keyword)) {
+        if (!empty($keyword)) {
 			$query->where(function ($query) use ($keyword, $salons_ids, $worker_ids, $customer_ids) {
 				if (!empty($customer_ids)) $query->orWhereIn('booking.customer_id', $customer_ids);
 				if (!empty($salons_ids)) $query->orWhereIn('booking.salon_id', $salons_ids);
 				if (!empty($worker_ids)) $query->orWhereIn('booking.worker_id', $worker_ids);
 				$query->orWhere('booking.booking_for', 'LIKE', $keyword . '%');
+                $query->orWhere('booking.contact_no', 'LIKE', '%' . $keyword . '%');
 			});
 		}
 
-		if (!empty($status)) $query->where('booking.booking_status', $status);
+        if (!empty($status)) $query->where('booking.booking_status', $status);
 		if (!empty($visit_type)) $query->where('booking.visit_type', $visit_type);
 		if (!empty($booking_date)) $query->whereDate('booking.booking_date', $booking_date);
 		if (!empty($salon_id)) $query->where('booking.salon_id', $salon_id);
 		if (!empty($year)) $query->whereYear('booking.booking_date', $year);
 		if (!empty($month)) $query->whereMonth('booking.booking_date', $month);
 
-		$query->orderBy('booking.booking_date', 'desc');
+        $query->orderBy('booking.booking_date', 'desc');
 
-		return ($is_paginate != 'nopaginate') ? $query->paginate(10) : $query->get();
+        return ($is_paginate != 'nopaginate') ? $query->paginate(10) : $query->get();
 	}
 	
 	public static function getCalenderBookings($salon_id = null, $month = null, $year = null, $is_paginate = null, $booking_date = null)
@@ -544,6 +546,18 @@ class SalonModel extends Model
     public static function addNote($booking_id, $note)
     {
         return DB::table('booking')->where('booking_id', $booking_id)->update(['note' => $note]);
+    }
+
+    public static function getCustomerBookingNotes($customer_id)
+    {
+        return DB::table('booking')->where('customer_id', $customer_id)->where('status', '!=', 'Deleted')
+            ->select(
+                'booking_id as bookingId',
+                'note',
+                'created_at as createdAt'
+            )
+            ->orderBy('created_at', 'desc')
+            ->get();
     }
 
     public static function confirm($booking_id, $is_double_confirmed)

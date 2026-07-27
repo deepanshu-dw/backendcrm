@@ -45,7 +45,7 @@ class CustomerModel extends Model
 			->whereNotNull('agreement_documents.contract_file')
 			->where('agreement_documents.contract_file', '!=', '')
 			->where('customers.status', '!=', 'Deleted')
-			->select('customers.*');
+			->select('customers.*','booking.contact_no');
 			// ->distinct(); // Ensures unique customers are selected
 
 		if (!empty($keyword)) {
@@ -54,6 +54,7 @@ class CustomerModel extends Model
 				  ->orWhere('customers.phone', 'LIKE', "%{$keyword}%")
 				  ->orWhere('customers.surname', 'LIKE', "%{$keyword}%")
 				  ->orWhere('customers.customer_name', 'LIKE', "%{$keyword}%")
+                  ->orWhere('booking.contact_no', 'LIKE', "%{$keyword}%")
 				  ->orWhere(DB::raw("CONCAT(customers.customer_name, ' ', customers.surname)"), 'LIKE', "%{$keyword}%");
 			});
 		}

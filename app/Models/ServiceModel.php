@@ -38,7 +38,8 @@ class serviceModel extends Model
 		if (!empty($lang)) {
 			$data->select(
 				'services.service_id', 
-				'services.service_name_' . $lang . ' as service_name', 
+				'services.service_name_' . $lang . ' as service_name',
+                'services.service_description_' . $lang . ' as service_description', //Added 
 				'groups.group_name_' . $lang . ' as group_name'
 			);
 		} else {

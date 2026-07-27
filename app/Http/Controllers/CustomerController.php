@@ -175,7 +175,7 @@ class CustomerController extends Controller
 
 			// Fetch agreement documents related to the customers
 			$agreement_documents = DB::table('agreement_documents')
-				->select('agreement_documents.*', 'booking.customer_id')
+				->select('agreement_documents.*', 'booking.customer_id','booking.contact_no')
 				->join('booking', 'booking.booking_id', '=', 'agreement_documents.booking_id')
 				->whereIn('booking.customer_id', $customer_ids)
 				->whereNotNull('agreement_documents.contract_file')
@@ -212,6 +212,12 @@ class CustomerController extends Controller
 
 					return $document;
 				});
+
+                // ADDED: attach contact_no at customer level (taking first available)
+                $customer->contact_no = optional(
+                    $documents_by_customer->get($customer->customer_id, collect())->first()
+                )->contact_no;
+
 			}
 
 			return response()->json(['result' => 1, 'msg' => 'Data Found', 'data' => $customers]);

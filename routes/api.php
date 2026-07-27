@@ -111,6 +111,7 @@ Route::group(['prefix' => 'salons'], function () {
     Route::get('sendCustomMail', [SalonController::class, 'sendCustomMail']);
     Route::post('getCustomerDetails', [SalonController::class, 'getCustomerDetails']);
     Route::post('addNote', [SalonController::class, 'addNote']);
+    Route::get('getCustomerBookingNotes', [SalonController::class,'getCustomerBookingNotes']);//add this to server
 
     Route::post('/confirm', [SalonController::class, 'confirmBooking']);
     Route::post('/updateB', [SalonController::class, 'updateB']);
