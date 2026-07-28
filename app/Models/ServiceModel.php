@@ -132,7 +132,7 @@ class serviceModel extends Model
                 ->select('service_id','services.service_name_es',
                 'services.service_name_en',
                 'services.service_name_pl',
-                'services.price_en','services.price_es','services.price_pl')
+                'services.price_en','services.price_es','services.price_pl','status')
                 ->whereIn('service_id',$service_id)
                 ->get();
             return $result;

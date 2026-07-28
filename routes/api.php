@@ -6,6 +6,7 @@ use App\Http\Controllers\HairController;
 use App\Http\Controllers\NotificationManagement;
 use App\Http\Controllers\SalonController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\SlotController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkerController;
@@ -206,6 +207,20 @@ Route::group(['prefix' => 'service'], function () {
     Route::post('/updateSubServices/{id}', [ServiceController::class, 'updateSubServices']);
     Route::get('/getSubServicesById/{id?}', [ServiceController::class, 'getSubServicesById']);
     Route::post('/deleteSubService/{id}', [ServiceController::class, 'deleteSubService']);
+});
+
+Route::group(['prefix' => 'category'], function () {
+    Route::get('/getAll', [CategoryController::class, 'getAllCategory']);
+    Route::post('/addCategory', [CategoryController::class, 'addCategory']);
+    Route::get('/getCategoryDetails/{categoryId}', [CategoryController::class, 'getCategoryById']);
+    Route::post('/updateCategory/{categoryId}', [CategoryController::class, 'updateCategory']);
+    Route::post('/deleteCategory/{categoryId}', [CategoryController::class, 'deleteCategory']);
+
+    // Route::get('/subServices', [ServiceController::class, 'subServices']);
+    // Route::post('/addSubServices', [ServiceController::class, 'addSubServices']);
+    // Route::post('/updateSubServices/{id}', [ServiceController::class, 'updateSubServices']);
+    // Route::get('/getSubServicesById/{id?}', [ServiceController::class, 'getSubServicesById']);
+    // Route::post('/deleteSubService/{id}', [ServiceController::class, 'deleteSubService']);
 });
 
 // -------------------------------------Customer Apis------------------------------------------------
