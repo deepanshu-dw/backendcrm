@@ -9,13 +9,34 @@ use Illuminate\Support\Facades\DB;
 class serviceModel extends Model
 {
     use HasFactory;
-    public static function addService($insert)
+    
+    public static function addService(array $insert)
     {
-        DB::table('services')
-        ->insert($insert);
-        return DB::getPdo()
-        ->lastInsertId();
+        return DB::table('services')->insertGetId($insert);
     }
+
+    public static function serviceNameExists(
+        $serviceName,
+        $excludeServiceId = null
+    ): bool {
+        $query = DB::table('services')
+            ->where('status', 'Active')
+            ->whereRaw(
+                'LOWER(TRIM(service_name_en)) = LOWER(?)',
+                [trim($serviceName)]
+            );
+
+        if (!empty($excludeServiceId)) {
+            $query->where(
+                'service_id',
+                '!=',
+                (int) $excludeServiceId
+            );
+        }
+
+        return $query->exists();
+    }
+
     public static function getAllServices($lang, $is_admin = "true", $user = null, $user_id = null, $keyword = null)
     {
 		if (($user == 'subadmin') && ($user_id)) {
@@ -38,9 +59,11 @@ class serviceModel extends Model
 		if (!empty($lang)) {
 			$data->select(
 				'services.service_id', 
-				'services.service_name_' . $lang . ' as service_name',
-                'services.service_description_' . $lang . ' as service_description', //Added 
-				'groups.group_name_' . $lang . ' as group_name'
+				'services.service_name_' . 'en' . ' as service_name',
+                'services.service_description_' . 'en' . ' as service_description', //Added 
+                'services.customer_name_' . $lang . ' as customer_name',
+                'services.price_' . $lang . ' as price',
+				// 'groups.group_name_' . $lang . ' as group_name'
 			);
 		} else {
 			$data->select('services.*', 'groups.group_name_en as group_name');
@@ -78,18 +101,28 @@ class serviceModel extends Model
       ->first();
     }
 
-    public static function updateService($update, $service_id)
+    public static function getServiceById($serviceId)
     {
         return DB::table('services')
-            ->where('service_id', $service_id)
+            ->where('service_id', $serviceId)
+            ->first();
+    }
+
+    public static function updateService(array $update,$serviceId): int {
+        return DB::table('services')
+            ->where('service_id', $serviceId)
+            ->where('status', 'Active')
             ->update($update);
     }
 
-    public static function deleteService($service_id)
-    {
+    public static function deleteService($serviceId): int {
         return DB::table('services')
-            ->where('service_id', $service_id)
-            ->update(['status' => 'Deleted']);
+            ->where('service_id', $serviceId)
+            ->where('status', 'Active')
+            ->update([
+                'status' => 'Inactive',
+                'updated_at' => now(),
+            ]);
     }
      // ------------------------------Payment History---------------------------------------------------------------------
 

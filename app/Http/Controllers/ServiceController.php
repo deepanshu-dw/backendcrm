@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ServiceModel;
+use App\Models\CategoryModel;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -10,58 +11,196 @@ use Illuminate\Http\Request;
 
 class ServiceController extends Controller
 {
-  //
-  public function addService(Request $request)
-  {
-    $Validator = Validator::make($request->all(), [
-      'service_name_en' => 'required',
-      'service_name_es' => 'required',
-      'service_name_pl' => 'required',
-      //  'price_en'=>'required',
-      //  'price_es'=>'required',
-      //  'price_pl'=>'required',
-      'service_time_taken' => 'required',
-    //   'group_id' => 'required'
-    ]);
-    if ($Validator->fails()) {
-      return response()->json(['result' => 0, 'errors' => $Validator->errors()->first()]);
-    }
 
-	$admin_id = $request->input('admin_id');
+  	public function addService(Request $request)
+	{
+		$validator = Validator::make($request->all(), [
+			'category_id' => 'required|integer|min:1',
 
-    $insert = [
-      'service_name_en' => $request->post('service_name_en'),
-      'service_name_es' => $request->post('service_name_es'),
-      'service_name_pl' => $request->post('service_name_pl'),
-      'price_en' => $request->post('price_en'),
-      'price_es' => $request->post('price_es'),
-      'price_pl' => $request->post('price_pl'),
-      'service_time_taken' => $request->post('service_time_taken'),
-      'group_id' => $request->post('group_id'),
-      'is_sub_service'=>$request->post('is_sub_service'),
-      'is_hair_extension'=>$request->post('is_hair_extension'),
-      'hair_gm'=>$request->post('hair_gm'),
-      'hair_per_unit'=> $request->post('hair_per_unit'),
-      'hair_gm_pln'=> $request->post('hair_gm_pln'),
-      'hair_gm_dl'=> $request->post('hair_gm_dl'),
-      'hair_gm_eu'=> $request->post('hair_gm_eu'),
-	  'is_archived'=>$request->post('is_archived')
-    ];
+			'service_name_en' => 'required|string|max:100',
+			'service_description_en' => 'required|string|max:500',
 
-    $result = ServiceModel::addService($insert);
+			'customer_name_en' => 'required|string|max:150',
+			'customer_name_es' => 'required|string|max:150',
+			'customer_name_pl' => 'required|string|max:150',
 
-    if ($result) {
-		DB::table('activity_logs')->insert([
-			'admin_id'   => $admin_id,
-			'action'     => 'Service Added',
-			'description'=> "New Service created: {$insert['service_name_en']}",
-			'created_at' => now(),
+			'price_type' => 'required|in:fixed,from,hair_weight',
+			'price_note' => 'nullable|string|max:150',
+
+			'price_en' => 'required|numeric|min:0',
+			'price_es' => 'required|numeric|min:0',
+			'price_pl' => 'required|numeric|min:0',
+
+			'service_time_taken' => 'required|integer|min:1',
+			'is_archived' => 'sometimes|string|in:Yes,No'
+		], [
+			'category_id.required' => 'Atleast one Category must be selected.',
+			'category_id.integer' => 'Category must be a valid number.',
+			'category_id.min' => 'Category must be greater than 0.',
+
+			// Service
+			'service_name_en.required' => 'Service Name is required.',
+			'service_name_en.string' => 'Service Name must be a string.',
+			'service_name_en.max' => 'Service Name is too long',
+
+			'service_description_en.required' => 'Service Description is required.',
+			'service_description_en.string' => 'Service Description must be a string.',
+			'service_description_en.max' => 'Service Description is too long.',
+
+			// Customer Name - English
+			'customer_name_en.required' => 'Customer Name (English) is required.',
+			'customer_name_en.string' => 'Customer Name (English) must be a string.',
+			'customer_name_en.max' => 'Customer Name (English) is too long.',
+
+			// Customer Name - Spanish
+			'customer_name_es.required' => 'Customer Name (Spanish) is required.',
+			'customer_name_es.string' => 'Customer Name (Spanish) must be a string.',
+			'customer_name_es.max' => 'Customer Name (Spanish) is too long.',
+
+			// Customer Name - Polish
+			'customer_name_pl.required' => 'Customer Name (Polish) is required.',
+			'customer_name_pl.string' => 'Customer Name (Polish) must be a string.',
+			'customer_name_pl.max' => 'Customer Name (Polish) is too long',
+
+			// Price Type
+			'price_type.required' => 'Price Type is required.',
+			'price_type.in' => 'Invalid Price Type. Allowed values are fixed, from, or hair_weight.',
+
+			// Price Note
+			'price_note.string' => 'Price Note must be a string.',
+			'price_note.max' => 'Price Note is too long',
+
+			// Prices
+			'price_en.required' => 'Price (English) is required.',
+			'price_en.numeric' => 'Price (English) must be a valid number.',
+			'price_en.min' => 'Price (English) cannot be less than 0.',
+
+			'price_es.required' => 'Price (Spanish) is required.',
+			'price_es.numeric' => 'Price (Spanish) must be a valid number.',
+			'price_es.min' => 'Price (Spanish) cannot be less than 0.',
+
+			'price_pl.required' => 'Price (Polish) is required.',
+			'price_pl.numeric' => 'Price (Polish) must be a valid number.',
+			'price_pl.min' => 'Price (Polish) cannot be less than 0.',
+
+			// Service Time
+			'service_time_taken.required' => 'Service Time Taken is required.',
+			'service_time_taken.integer' => 'Service Time Taken must be a valid integer.',
+			'service_time_taken.min' => 'Service Time Taken must be at least 1 minute.',
+
+			// Archived
+			'is_archived.string' => 'Archive status must be a string.',
+			'is_archived.in' => 'Invalid archive status. Allowed values are Yes or No.',
 		]);
-      return response()->json(['result' => 1, 'msg' => 'Service Added Successfully', 'data' => $result]);
-    } else {
-      return response()->json(['result' => -1, 'msg' => 'Service Not Added ']);
-    }
-  }
+
+		if ($validator->fails()) {
+            return response()->json([
+                "result" => 0,
+                "errors" => $validator->errors()->first(),
+            ]);
+        }
+
+		$serviceName = trim($request->input('service_name_en'));
+
+		if (ServiceModel::serviceNameExists($serviceName)) {
+			return response()->json([
+				'result' => 0,
+				'msg' => "This Service already exists. Please enter a unique service name.",
+			]);
+		}
+
+		$categoryId = (int) $request->input('category_id');
+
+		/*
+		* Validate that the category exists.
+		*/
+		$category = CategoryModel::getCategoryById($categoryId);
+
+		if (!$category) {
+			return response()->json([
+				'result' => 0,
+				'msg' => 'Please provide a valid category.',
+			]);
+		}
+
+		if ($category->status !== 'Active') {
+			return response()->json([
+				'result' => 0,
+				'msg' => 'Please provide an active category.',
+			]);
+		}
+
+		$service_thumbnail = null;
+
+		if (!empty($request->hasfile('service_thumbnail'))) {
+			$service_thumbnail = singleAwsUpload(
+				$request,
+				'service_thumbnail'
+			);
+		}
+
+		$insert = [
+			'category_id' => $categoryId,
+			'service_name_en' => $serviceName,
+			'service_description_en' =>
+				$request->input('service_description_en'),
+
+			'customer_name_en' =>
+				trim($request->input('customer_name_en')),
+			'customer_name_es' =>
+				trim($request->input('customer_name_es')),
+			'customer_name_pl' =>
+				trim($request->input('customer_name_pl')),
+
+			'price_type' => $request->input('price_type'),
+			'price_note' => $request->input('price_note'),
+
+			'price_en' => (float) $request->input('price_en'),
+			'price_es' => (float) $request->input('price_es'),
+			'price_pl' => (float) $request->input('price_pl'),
+
+			'service_time_taken' =>
+				(int) $request->input('service_time_taken'),
+
+			'is_archived' =>
+				$request->input('is_archived', 'No'),
+			'service_thumbnail' =>
+				$request->input('service_thumbnail'),
+			'status' => 'Active',
+			'created_at' => now(),
+			'updated_at' => now(),
+		];
+
+		$serviceId = ServiceModel::addService($insert);
+
+		if (!$serviceId) {
+			return response()->json([
+				'result' => -1,
+				'msg' => 'Service not added.',
+			]);
+		}
+
+		$adminId = $request->input('admin_id');
+
+		if ($adminId) {
+			DB::table('activity_logs')->insert([
+				'admin_id' => $adminId,
+				'action' => 'Service Added',
+				'description' =>
+					"New service created: {$insert['service_name_en']}",
+				'created_at' => now(),
+			]);
+		}
+
+		return response()->json([
+			'result' => 1,
+			'msg' => 'Service added successfully.',
+			'data' => [
+				'service_id' => (int) $serviceId,
+				'category_id' => $categoryId,
+			],
+		]);
+	}
 
 	public function getAllServices(Request $request, $lang)
 	{
@@ -93,85 +232,375 @@ class ServiceController extends Controller
 		}
 	}
 
-	public function updateService(Request $request, $service_id)
+	public function updateService(Request $request, $serviceId)
 	{
-	  $Validator = Validator::make($request->all(), [
-		'service_name_en' => 'required',
-		'service_name_es' => 'required',
-		'service_name_pl' => 'required',
-		//  'price_en'=>'required',
-		//  'price_es'=>'required',
-		//  'price_pl'=>'required',
-		'service_time_taken' => 'required',
-	   // 'group_id' => 'required'
-	  ]);
-	  if ($Validator->fails()) {
-		return response()->json(['result' => 0, 'errors' => $Validator->errors()->first()]);
-	  }
-  
-	  $admin_id = $request->post('admin_id');
-  
-	  $update = [
-		'service_name_en' => $request->post('service_name_en'),
-		'service_name_es' => $request->post('service_name_es'),
-		'service_name_pl' => $request->post('service_name_pl'),
-		'price_en' => $request->post('price_en'),
-		'price_es' => $request->post('price_es'),
-		'price_pl' => $request->post('price_pl'),
-		'service_time_taken' => $request->post('service_time_taken'),
-		'group_id' => $request->post('group_id'),
-		'is_hair_extension'=>$request->post('is_hair_extension'),
-		'hair_gm'=>$request->post('hair_gm'),
-		'hair_per_unit'=> $request->post('hair_per_unit'),
-		'hair_gm_pln'=> $request->post('hair_gm_pln'),
-		'hair_gm_dl'=> $request->post('hair_gm_dl'),
-		'hair_gm_eu'=> $request->post('hair_gm_eu'),
-		'is_archived'=>$request->post('is_archived')
-	  ];
-  
-	  $result = ServiceModel::updateService($update, $service_id);
-  
-	  if ($result) {
-		  DB::table('activity_logs')->insert([
-			  'admin_id'   => $admin_id,
-			  'action'     => 'Service Added',
-			  'description'=> "New Service created: {$update['service_name_en']}",
-			  'created_at' => now(),
-		  ]);
-		return response()->json(['result' => 1, 'msg' => 'Service Updated Successfully', 'data' => $result]);
-	  } else {
-		return response()->json(['result' => -1, 'msg' => 'No Changes Updated']);
-	  }
-	}
-	
-	public function deleteService(Request $request,$service_id)
-	{
-		$admin_id = $request->post('admin_id');
-		$service = DB::table('services')->where('service_id', $service_id)->first();
+		if (!is_numeric($serviceId) || (int) $serviceId <= 0) {
+			return response()->json([
+				'result' => 0,
+				'msg' => 'Please provide a valid service ID.',
+			]);
+		}
+
+		$serviceId = (int) $serviceId;
+
+		$service = ServiceModel::getServiceById($serviceId);
+
 		if (!$service) {
-            return response()->json(['result' => -1, 'msg' => 'Service not found']);
-        }
-		$result = ServiceModel::deleteService($service_id);
-		if ($result) {
+			return response()->json([
+				'result' => -1,
+				'msg' => 'Service not found.',
+			]);
+		}
 
-			DB::table('activity_logs')->insert([
-                'admin_id'   => $admin_id,
-                'action'     => 'Deleted Service',
-                'description'=> "Deleted Service: {$service->service_name_en} (ID: {$service->service_id})",
-                'created_at' => now(),
+		/*
+		* Only active services can be updated.
+		*/
+		if ($service->status !== 'Active') {
+			return response()->json([
+				'result' => -1,
+				'msg' => 'Only active services can be updated.',
+			]);
+		}
+
+		$validator = Validator::make($request->all(), [
+			'category_id' => 'sometimes|required|integer|min:1',
+			'service_name_en' => 'sometimes|required|string|max:150',
+			'service_description_en' => 'sometimes|required|string',
+
+			'customer_name_en' => 'sometimes|required|string|max:150',
+			'customer_name_es' => 'sometimes|required|string|max:150',
+			'customer_name_pl' => 'sometimes|required|string|max:150',
+
+			'price_type' => 'sometimes|required|in:fixed,from,hair_weight',
+			'price_note' => 'sometimes|nullable|string|max:500',
+
+			'price_en' => 'sometimes|required|numeric|min:0',
+			'price_es' => 'sometimes|required|numeric|min:0',
+			'price_pl' => 'sometimes|required|numeric|min:0',
+
+			'service_time_taken' => 'sometimes|required|integer|min:1',
+			'is_archived' => 'sometimes|string|in:Yes,No',
+		], [
+			'category_id.required' => 'Atleast one Category must be selected.',
+			'category_id.integer' => 'Category must be a valid number.',
+			'category_id.min' => 'Category must be greater than 0.',
+
+			// Service
+			'service_name_en.required' => 'Service Name is required.',
+			'service_name_en.string' => 'Service Name must be a string.',
+			'service_name_en.max' => 'Service Name is too long',
+
+			'service_description_en.required' => 'Service Description is required.',
+			'service_description_en.string' => 'Service Description must be a string.',
+			'service_description_en.max' => 'Service Description is too long.',
+
+			// Customer Name - English
+			'customer_name_en.required' => 'Customer Name (English) is required.',
+			'customer_name_en.string' => 'Customer Name (English) must be a string.',
+			'customer_name_en.max' => 'Customer Name (English) is too long.',
+
+			// Customer Name - Spanish
+			'customer_name_es.required' => 'Customer Name (Spanish) is required.',
+			'customer_name_es.string' => 'Customer Name (Spanish) must be a string.',
+			'customer_name_es.max' => 'Customer Name (Spanish) is too long.',
+
+			// Customer Name - Polish
+			'customer_name_pl.required' => 'Customer Name (Polish) is required.',
+			'customer_name_pl.string' => 'Customer Name (Polish) must be a string.',
+			'customer_name_pl.max' => 'Customer Name (Polish) is too long',
+
+			// Price Type
+			'price_type.required' => 'Price Type is required.',
+			'price_type.in' => 'Invalid Price Type. Allowed values are fixed, from, or hair_weight.',
+
+			// Price Note
+			'price_note.string' => 'Price Note must be a string.',
+			'price_note.max' => 'Price Note is too long',
+
+			// Prices
+			'price_en.required' => 'Price (English) is required.',
+			'price_en.numeric' => 'Price (English) must be a valid number.',
+			'price_en.min' => 'Price (English) cannot be less than 0.',
+
+			'price_es.required' => 'Price (Spanish) is required.',
+			'price_es.numeric' => 'Price (Spanish) must be a valid number.',
+			'price_es.min' => 'Price (Spanish) cannot be less than 0.',
+
+			'price_pl.required' => 'Price (Polish) is required.',
+			'price_pl.numeric' => 'Price (Polish) must be a valid number.',
+			'price_pl.min' => 'Price (Polish) cannot be less than 0.',
+
+			// Service Time
+			'service_time_taken.required' => 'Service Time Taken is required.',
+			'service_time_taken.integer' => 'Service Time Taken must be a valid integer.',
+			'service_time_taken.min' => 'Service Time Taken must be at least 1 minute.',
+
+			// Archived
+			'is_archived.string' => 'Archive status must be a string.',
+			'is_archived.in' => 'Invalid archive status. Allowed values are Yes or No.',
+		]);
+
+		if ($validator->fails()) {
+            return response()->json([
+                "result" => 0,
+                "errors" => $validator->errors()->first(),
             ]);
+        }
 
-			$subservices = ServiceModel::getSubserviceByServiceId($service_id);
+		$allowedFields = [
+			'category_id',
+			'service_name_en',
+			'service_description_en',
+			'customer_name_en',
+			'customer_name_es',
+			'customer_name_pl',
+			'price_type',
+			'price_note',
+			'price_en',
+			'price_es',
+			'price_pl',
+			'service_time_taken',
+			'is_archived',
+		];
 
-			if ($subservices) {
-				ServiceModel::deleteSubservicesByServiceId($service_id);
-				
+		if (!$request->hasAny($allowedFields)) {
+			return response()->json([
+				'result' => 0,
+				'msg' => 'Please provide at least one field to update.',
+			]);
+		}
+
+		$serviceName = null;
+
+		if ($request->has('service_name_en')) {
+			$serviceName = trim(
+				$request->input('service_name_en')
+			);
+
+			if (
+				ServiceModel::serviceNameExists(
+					$serviceName,
+					$serviceId
+				)
+			) {
+				return response()->json([
+					'result' => 0,
+					'msg' => "This Service already exists. Please enter a unique service name.",
+				]);
+			}
+		}
+
+		/*
+		* Validate category only when category_id
+		* is included in the update request.
+		*/
+		if ($request->has('category_id')) {
+			$categoryId = (int) $request->input('category_id');
+
+			$category = CategoryModel::getCategoryById(
+				$categoryId
+			);
+
+			if (!$category) {
+				return response()->json([
+					'result' => 0,
+					'msg' => 'Please provide a valid category.',
+				]);
 			}
 
-			return response()->json(['result' => 1, 'msg' => 'Services Deleted Successfully']);
-		} else {
-			return response()->json(['result' => -1, 'msg' => 'Try Again later']);
+			if ($category->status !== 'Active') {
+				return response()->json([
+					'result' => 0,
+					'msg' => 'Please provide an active category.',
+				]);
+			}
 		}
+
+		$update = [];
+
+		if ($request->has('category_id')) {
+			$update['category_id'] =
+				(int) $request->input('category_id');
+		}
+
+		if ($request->has('service_name_en')) {
+			$update['service_name_en'] = $serviceName;
+		}
+
+		if ($request->has('service_description_en')) {
+			$update['service_description_en'] =
+				$request->input('service_description_en');
+		}
+
+		if ($request->has('customer_name_en')) {
+			$update['customer_name_en'] = trim(
+				$request->input('customer_name_en')
+			);
+		}
+
+		if ($request->has('customer_name_es')) {
+			$update['customer_name_es'] = trim(
+				$request->input('customer_name_es')
+			);
+		}
+
+		if ($request->has('customer_name_pl')) {
+			$update['customer_name_pl'] = trim(
+				$request->input('customer_name_pl')
+			);
+		}
+
+		if ($request->has('price_type')) {
+			$update['price_type'] =
+				$request->input('price_type');
+		}
+
+		/*
+		* exists() is used because price_note
+		* may intentionally be set to null.
+		*/
+		if ($request->exists('price_note')) {
+			$update['price_note'] =
+				$request->input('price_note');
+		}
+
+		if ($request->has('price_en')) {
+			$update['price_en'] =
+				(float) $request->input('price_en');
+		}
+
+		if ($request->has('price_es')) {
+			$update['price_es'] =
+				(float) $request->input('price_es');
+		}
+
+		if ($request->has('price_pl')) {
+			$update['price_pl'] =
+				(float) $request->input('price_pl');
+		}
+
+		if ($request->has('service_time_taken')) {
+			$update['service_time_taken'] =
+				(int) $request->input('service_time_taken');
+		}
+
+		if ($request->has('is_archived')) {
+			$update['is_archived'] =
+				$request->input('is_archived');
+		}
+
+		$update['updated_at'] = now();
+
+		$result = ServiceModel::updateService(
+			$update,
+			$serviceId
+		);
+
+		if ($result === 0) {
+			return response()->json([
+				'result' => -1,
+				'msg' => 'No changes were detected.',
+			]);
+		}
+
+		$adminId = $request->input('admin_id');
+
+		if ($adminId) {
+			$updatedServiceName =
+				$update['service_name_en']
+				?? $service->service_name_en;
+
+			DB::table('activity_logs')->insert([
+				'admin_id' => $adminId,
+				'action' => 'Service Updated',
+				'description' =>
+					"Service updated: {$updatedServiceName} (ID: {$serviceId})",
+				'created_at' => now(),
+			]);
+		}
+
+		return response()->json([
+			'result' => 1,
+			'msg' => 'Service updated successfully.',
+			'data' => [
+				'service_id' => $serviceId,
+				'updated_fields' => array_values(
+					array_diff(
+						array_keys($update),
+						['updated_at']
+					)
+				),
+			],
+		]);
+	}
+	
+	public function deleteService(Request $request,$serviceId) 
+	{
+		if (!is_numeric($serviceId) || (int) $serviceId <= 0) {
+			return response()->json([
+				'result' => 0,
+				'msg' => 'Please provide a valid service ID.',
+			]);
+		}
+
+		$serviceId = (int) $serviceId;
+
+		$service = ServiceModel::getServiceById($serviceId);
+
+		if (!$service) {
+			return response()->json([
+				'result' => -1,
+				'msg' => 'Service not found.',
+			]);
+		}
+
+		if ($service->status === 'Inactive') {
+			return response()->json([
+				'result' => -1,
+				'msg' => 'Service is already inactive.',
+			]);
+		}
+
+		$result = ServiceModel::deleteService($serviceId);
+
+		if (!$result) {
+			return response()->json([
+				'result' => -1,
+				'msg' => 'Service could not be deleted.',
+			]);
+		}
+
+		$adminId = $request->input('admin_id');
+
+		if ($adminId) {
+			DB::table('activity_logs')->insert([
+				'admin_id' => $adminId,
+				'action' => 'Service Deleted',
+				'description' =>
+					"Service marked inactive: {$service->service_name_en} (ID: {$serviceId})",
+				'created_at' => now(),
+			]);
+		}
+
+		/*
+		* No sub-service concept is currently being used.
+		*
+		* Keep this only if sub-services may return later:
+		*
+		* $subservices =
+		*     ServiceModel::getSubserviceByServiceId($serviceId);
+		*
+		* if ($subservices && !$subservices->isEmpty()) {
+		*     ServiceModel::deleteSubservicesByServiceId(
+		*         $serviceId
+		*     );
+		* }
+		*/
+
+		return response()->json([
+			'result' => 1,
+			'msg' => 'Service deleted successfully.',
+		]);
 	}
    // ---------------------------Payment History Apis ---------------------------------------------------------------
    public function getAllPaymentHistory()

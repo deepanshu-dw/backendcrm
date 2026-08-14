@@ -2,150 +2,141 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ServiceModel;
 use App\Models\CategoryModel;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
+use App\Models\ServiceModel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class CategoryController extends Controller
 {
-
-    public function addCategory(Request $request) {
+    public function addCategory(Request $request)
+    {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:150',
-            'description' => 'required|string',
-            'display_order' => 'required|integer|min:0',
-            'category_services' => 'required',
+            "name" => "required|string|max:100",
+            "description" => "required|string|max:500",
+            "booking_type" => "required|in:fixed_time,time_window",
+            "service_ids" => "sometimes|nullable",
+        ], [
+            "name.required" => "Category Name is required.",
+            "name.string"   => "Category Name must be a string.",
+            "name.max"      => "Category Name is too long.",
+
+            "description.required" => "Description is required.",
+            "description.string"   => "Description must be a string.",
+            "description.max"      => "Description is too long.",
+
+            "booking_type.required" => "Booking Type is required.",
+            "booking_type.in"       => "Invalid booking type.",
+
+            "service_ids" => "Invalid service IDs.",
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'result' => 0,
-                'errors' => $validator->errors()->first(),
+                "result" => 0,
+                "errors" => $validator->errors()->first(),
             ]);
         }
 
-        $adminId = $request->input('admin_id');
-        $serviceIds = $request->input('category_services');
+        $categoryName = trim($request->input("name"));
 
-       
-        if (is_string($serviceIds)) {
-            $serviceIds = json_decode($serviceIds, true);
-        }
-
-        if (!is_array($serviceIds) || empty($serviceIds)) {
+        if (CategoryModel::categoryNameExists($categoryName)) {
             return response()->json([
-                'result' => 0,
-                'msg' => 'Category services must be a valid non-empty array.',
+                "result" => 0,
+                "msg" => "Category already exists. Please enter a unique Category name.",
             ]);
         }
 
-       
-        $serviceIds = array_values(array_unique(array_map('intval', $serviceIds)));
+        $serviceIds = $this->prepareServiceIds(
+            $request->input("service_ids"),
+            false
+        );
 
-        foreach ($serviceIds as $serviceId) {
-            if ($serviceId <= 0) {
-                return response()->json([
-                    'result' => 0,
-                    'msg' => 'Please provide a valid service.',
-                    'invalid_service_id' => $serviceId,
-                ]);
-            }
+        if (!empty($serviceIds)) {
+            $invalidServiceResponse = $this->validateServicesForCategory(
+                $serviceIds
+            );
 
-            $service = ServiceModel::getServices($serviceId)->first();
-
-            if (!$service || $service->status !== 'Active') {
-                return response()->json([
-                    'result' => 0,
-                    'msg' => 'Please provide a valid or active service.',
-                    'invalid_service_id' => $serviceId,
-                ]);
+            if ($invalidServiceResponse) {
+                return $invalidServiceResponse;
             }
         }
 
         $categoryInsert = [
-            'name' => trim($request->input('name')),
-            'description' => $request->input('description'),
-            'display_order' => (int) $request->input('display_order'),
+            "name" => $categoryName,
+            "description" => trim($request->input("description")),
+            "booking_type" => $request->input("booking_type"),
+            "status" => "Active",
+            "created_at" => now(),
+            "updated_at" => now(),
         ];
 
         $categoryId = CategoryModel::addCategory($categoryInsert);
 
         if (!$categoryId) {
             return response()->json([
-                'result' => -1,
-                'msg' => 'Category not added.',
+                "result" => -1,
+                "msg" => "Category not added.",
             ]);
         }
 
-        $categoryServiceInsert = [];
+        if (!empty($serviceIds)) {
+            $assignedCount = CategoryModel::assignServicesToCategory(
+                $categoryId,
+                $serviceIds
+            );
 
-        foreach ($serviceIds as $serviceId) {
-            $categoryServiceInsert[] = [
-                'category_id' => $categoryId,
-                'service_id' => $serviceId,
-            ];
+            if ((int) $assignedCount !== count($serviceIds)) {
+                CategoryModel::removeAllCategoryServices($categoryId);
+                CategoryModel::permanentlyDeleteCategory($categoryId);
+
+                return response()->json([
+                    "result" => -1,
+                    "msg" => "Category services could not be assigned.",
+                ]);
+            }
         }
 
-        $servicesInserted = CategoryModel::addCategoryServices(
-            $categoryServiceInsert
-        );
-
-        if (!$servicesInserted) {
-            DB::table('categories')
-                ->where('id', $categoryId)
-                ->delete();
-
-            return response()->json([
-                'result' => -1,
-                'msg' => 'Category services could not be added.',
-            ]);
-        }
+        $adminId = $request->input("admin_id");
 
         if ($adminId) {
-            DB::table('activity_logs')->insert([
-                'admin_id' => $adminId,
-                'action' => 'Category Added',
-                'description' => "Category created with services: {$categoryInsert['name']}",
-                'created_at' => now(),
+            DB::table("activity_logs")->insert([
+                "admin_id" => $adminId,
+                "action" => "Category Added",
+                "description" => empty($serviceIds)
+                    ? "Category created without services: {$categoryInsert['name']}"
+                    : "Category created with services: {$categoryInsert['name']}",
+                "created_at" => now(),
             ]);
         }
 
         return response()->json([
-            'result' => 1,
-            'msg' => 'Category added successfully.',
-            'data' => [
-                'category_id' => (int) $categoryId,
-                'service_ids' => $serviceIds,
+            "result" => 1,
+            "msg" => "Category added successfully.",
+            "data" => [
+                "category_id" => (int) $categoryId,
+                "service_ids" => $serviceIds,
             ],
         ]);
     }
 
     public function getAllCategory(Request $request)
     {
-        $status = $request->query('status');
+        $keyword = $request->query("keyword");
 
-        if (!empty($status) &&!in_array($status, ['Active', 'Inactive'])) {
-            return response()->json([
-                'result' => 0,
-                'msg' => 'Status must be Active or Inactive.',
-            ]);
-        }
-
-        $categories = CategoryModel::getAllCategories($status);
+        $categories = CategoryModel::getAllCategories("Active", $keyword);
 
         if ($categories->isEmpty()) {
             return response()->json([
-                'result' => -1,
-                'msg' => 'No categories found.',
-                'data' => [],
+                "result" => -1,
+                "msg" => "No categories found.",
+                "data" => [],
             ]);
         }
 
         $categoryIds = $categories
-            ->pluck('id')
+            ->pluck("id")
             ->map(function ($categoryId) {
                 return (int) $categoryId;
             })
@@ -153,50 +144,52 @@ class CategoryController extends Controller
 
         $services = CategoryModel::getServicesByCategoryIds($categoryIds);
 
-        $servicesByCategory = $services->groupBy('category_id');
+        $servicesByCategory = $services->groupBy("category_id");
 
         foreach ($categories as $category) {
-            $category->category_services =
-                $servicesByCategory->get(
-                    $category->id,
-                    collect()
-                )->values();
+            $category->services = $servicesByCategory
+                ->get($category->id, collect())
+                ->values();
         }
 
         return response()->json([
-            'result' => 1,
-            'msg' => 'Categories found.',
-            'data' => $categories,
+            "result" => 1,
+            "msg" => "Categories found.",
+            "data" => $categories,
         ]);
     }
 
     public function getCategoryById($categoryId)
     {
-        if (!is_numeric($categoryId) || $categoryId <= 0) {
+        if (!is_numeric($categoryId) || (int) $categoryId <= 0) {
             return response()->json([
-                'result' => 0,
-                'msg' => 'Please provide a valid category ID.',
+                "result" => 0,
+                "msg" => "Please provide a valid category ID.",
             ]);
         }
 
-        $category = CategoryModel::getCategoryById($categoryId);
+        $categoryId = (int) $categoryId;
+
+        $category = CategoryModel::getCategoryById(
+            $categoryId,
+            "Active"
+        );
 
         if (!$category) {
             return response()->json([
-                'result' => -1,
-                'msg' => 'Category not found.',
+                "result" => -1,
+                "msg" => "Category not found.",
             ]);
         }
 
-        $category->category_services =
-            CategoryModel::getCategoryServices(
-                $categoryId
-            );
+        $category->services = CategoryModel::getServicesByCategoryId(
+            $categoryId
+        );
 
         return response()->json([
-            'result' => 1,
-            'msg' => 'Category found.',
-            'data' => $category,
+            "result" => 1,
+            "msg" => "Category found.",
+            "data" => $category,
         ]);
     }
 
@@ -204,8 +197,8 @@ class CategoryController extends Controller
     {
         if (!is_numeric($categoryId) || (int) $categoryId <= 0) {
             return response()->json([
-                'result' => 0,
-                'msg' => 'Please provide a valid category ID.',
+                "result" => 0,
+                "msg" => "Please provide a valid category ID.",
             ]);
         }
 
@@ -215,97 +208,126 @@ class CategoryController extends Controller
 
         if (!$category) {
             return response()->json([
-                'result' => -1,
-                'msg' => 'Category not found.',
+                "result" => -1,
+                "msg" => "Category not found.",
             ]);
         }
 
         $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|required|string|max:150',
-            'description' => 'sometimes|required|string',
-            'image_url' => 'sometimes|nullable|string|max:500',
-            'display_order' => 'sometimes|required|integer|min:0',
-            'status' => 'sometimes|required|in:Active,Inactive',
-            'category_services' => 'sometimes|required',
+            "name" => "sometimes|required|string|max:100",
+            "description" => "sometimes|required|string|max:500",
+            "image_url" => "sometimes|nullable|string|max:500",
+            "booking_type" => "sometimes|required|in:fixed_time,time_window",
+            "status" => "sometimes|required|in:Active,Inactive",
+            "service_ids" => "sometimes|required",
+        ],[
+            "name.required" => "Category Name is required.",
+            "name.string"   => "Category Name must be a string.",
+            "name.max"      => "Category Name is too long.",
+
+            "description.required" => "Description is required.",
+            "description.string"   => "Description must be a string.",
+            "description.max"      => "Description is too long.",
+
+            "booking_type.required" => "Booking Type is required.",
+            "booking_type.in"       => "Invalid booking type.",
+
+            "service_ids" => "Invalid service IDs.",
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'result' => 0,
-                'errors' => $validator->errors()->first(),
+                "result" => 0,
+                "errors" => $validator->errors()->first(),
             ]);
         }
 
         $allowedFields = [
-            'name',
-            'description',
-            'image_url',
-            'display_order',
-            'status',
-            'category_services',
+            "name",
+            "description",
+            "image_url",
+            "booking_type",
+            "status",
+            "service_ids",
         ];
 
         if (!$request->hasAny($allowedFields)) {
             return response()->json([
-                'result' => 0,
-                'msg' => 'Please provide at least one field to update.',
+                "result" => 0,
+                "msg" => "Please provide at least one field to update.",
             ]);
         }
 
-        $categoryUpdate = [];
+        if ($request->has("name")) {
+            $categoryName = trim($request->input("name"));
 
-        if ($request->has('name')) {
-            $categoryUpdate['name'] = trim($request->input('name'));
-        }
-
-        if ($request->has('description')) {
-            $categoryUpdate['description'] = $request->input('description');
-        }
-
-        if ($request->exists('image_url')) {
-            $categoryUpdate['image_url'] = $request->input('image_url');
-        }
-
-        if ($request->has('display_order')) {
-            $categoryUpdate['display_order'] =
-                (int) $request->input('display_order');
-        }
-
-        if ($request->has('status')) {
-            $categoryUpdate['status'] = $request->input('status');
-        }
-
-        if (!empty($categoryUpdate)) {
-            $categoryUpdate['updated_at'] = now();
-
-            CategoryModel::updateCategory(
-                $categoryId,
-                $categoryUpdate
-            );
+            if (
+                CategoryModel::categoryNameExists(
+                    $categoryName,
+                    $categoryId
+                )
+            ) {
+                return response()->json([
+                    "result" => 0,
+                    "msg" => "Category already exists. Please enter a unique Category name.",
+                ]);
+            }
         }
 
         $serviceIds = null;
 
-        if ($request->has('category_services')) {
+        if ($request->has("service_ids")) {
             $serviceIds = $this->prepareServiceIds(
-                $request->input('category_services')
+                $request->input("service_ids"),
+                true
             );
 
-            if (!$serviceIds) {
+            if ($serviceIds === null) {
                 return response()->json([
-                    'result' => 0,
-                    'msg' => 'Category services must be a valid non-empty array.',
+                    "result" => 0,
+                    "msg" => "Service IDs must be a valid array.",
                 ]);
             }
 
-            $invalidServiceResponse = $this->validateServices(
-                $serviceIds
+            $invalidServiceResponse = $this->validateServicesForCategory(
+                $serviceIds,
+                $categoryId
             );
 
             if ($invalidServiceResponse) {
                 return $invalidServiceResponse;
             }
+        }
 
+        $categoryUpdate = [];
+
+        if ($request->has("name")) {
+            $categoryUpdate["name"] = $categoryName;
+        }
+
+        if ($request->has("description")) {
+            $categoryUpdate["description"] = $request->input(
+                "description"
+            );
+        }
+
+        if ($request->exists("image_url")) {
+            $categoryUpdate["image_url"] = $request->input(
+                "image_url"
+            );
+        }
+
+        if ($request->has("booking_type")) {
+            $categoryUpdate["booking_type"] = $request->input(
+                "booking_type"
+            );
+        }
+
+        if ($request->has("status")) {
+            $categoryUpdate["status"] = $request->input("status");
+        }
+
+        if ($serviceIds !== null) {
             $servicesUpdated = CategoryModel::syncCategoryServices(
                 $categoryId,
                 $serviceIds
@@ -313,76 +335,159 @@ class CategoryController extends Controller
 
             if (!$servicesUpdated) {
                 return response()->json([
-                    'result' => -1,
-                    'msg' => 'Category services could not be updated.',
+                    "result" => -1,
+                    "msg" => "Category services could not be updated.",
                 ]);
             }
         }
 
-        $adminId = $request->input('admin_id');
+        if (!empty($categoryUpdate)) {
+            $categoryUpdate["updated_at"] = now();
+
+            CategoryModel::updateCategory(
+                $categoryId,
+                $categoryUpdate
+            );
+        }
+
+        $adminId = $request->input("admin_id");
 
         if ($adminId) {
-            DB::table('activity_logs')->insert([
-                'admin_id' => $adminId,
-                'action' => 'Category Updated',
-                'description' => "Category updated: {$category->name}",
-                'created_at' => now(),
+            $updatedCategoryName =
+                $categoryUpdate["name"] ?? $category->name;
+
+            DB::table("activity_logs")->insert([
+                "admin_id" => $adminId,
+                "action" => "Category Updated",
+                "description" => "Category updated with services: {$updatedCategoryName}",
+                "created_at" => now(),
             ]);
         }
 
         return response()->json([
-            'result' => 1,
-            'msg' => 'Category updated successfully.',
+            "result" => 1,
+            "msg" => "Category updated successfully.",
+            "data" => [
+                "category_id" => $categoryId,
+                "service_ids" => $serviceIds,
+            ],
         ]);
     }
 
-    public function deleteCategory(Request $request,$categoryId) {
-        if (!is_numeric($categoryId) || $categoryId <= 0) {
+    public function deleteCategory(Request $request, $categoryId)
+    {
+        if (!is_numeric($categoryId) || (int) $categoryId <= 0) {
             return response()->json([
-                'result' => 0,
-                'msg' => 'Please provide a valid category ID.',
+                "result" => 0,
+                "msg" => "Please provide a valid category ID.",
             ]);
         }
+
+        $categoryId = (int) $categoryId;
 
         $category = CategoryModel::getCategoryById($categoryId);
 
         if (!$category) {
             return response()->json([
-                'result' => -1,
-                'msg' => 'Category not found.',
+                "result" => -1,
+                "msg" => "Category not found.",
             ]);
         }
 
-        if ($category->status === 'Inactive') {
+        if ($category->status === "Inactive") {
             return response()->json([
-                'result' => -1,
-                'msg' => 'Category is already deleted.',
+                "result" => -1,
+                "msg" => "Category is already deleted.",
             ]);
         }
+
+        CategoryModel::removeAllCategoryServices($categoryId);
 
         $result = CategoryModel::deleteCategory($categoryId);
 
         if (!$result) {
             return response()->json([
-                'result' => -1,
-                'msg' => 'Category could not be deleted.',
+                "result" => -1,
+                "msg" => "Category could not be deleted.",
             ]);
         }
 
-        $adminId = $request->input('admin_id');
+        $adminId = $request->input("admin_id");
 
         if ($adminId) {
-            DB::table('activity_logs')->insert([
-                'admin_id' => $adminId,
-                'action' => 'Category Deleted',
-                'description' => "Category marked inactive: {$category->name}",
-                'created_at' => now(),
+            DB::table("activity_logs")->insert([
+                "admin_id" => $adminId,
+                "action" => "Category Deleted",
+                "description" => "Category marked inactive: {$category->name}",
+                "created_at" => now(),
             ]);
         }
 
         return response()->json([
-            'result' => 1,
-            'msg' => 'Category deleted successfully.',
+            "result" => 1,
+            "msg" => "Category deleted successfully.",
         ]);
+    }
+
+    private function prepareServiceIds(
+        $serviceIds,
+        bool $allowEmpty = false
+    ): ?array {
+        if (is_string($serviceIds)) {
+            $serviceIds = json_decode($serviceIds, true);
+        }
+
+        if (!is_array($serviceIds)) {
+            return null;
+        }
+
+        if (empty($serviceIds)) {
+            return $allowEmpty ? [] : null;
+        }
+
+        $serviceIds = array_values(
+            array_unique(array_map("intval", $serviceIds))
+        );
+
+        foreach ($serviceIds as $serviceId) {
+            if ($serviceId <= 0) {
+                return null;
+            }
+        }
+
+        return $serviceIds;
+    }
+
+    private function validateServicesForCategory(
+        array $serviceIds,
+        $currentCategoryId = null
+    ) {
+        foreach ($serviceIds as $serviceId) {
+            $service = ServiceModel::getServices($serviceId)->first();
+
+            if (!$service || $service->status !== "Active") {
+                return response()->json([
+                    "result" => 0,
+                    "msg" => "Please provide a valid or active service.",
+                    "invalid_service_id" => $serviceId,
+                ]);
+            }
+
+            $assignedCategoryId = $service->category_id ?? null;
+
+            if (
+                !empty($assignedCategoryId) &&
+                (int) $assignedCategoryId !== (int) $currentCategoryId
+            ) {
+                return response()->json([
+                    "result" => 0,
+                    "msg" => "Service is already assigned to another category.",
+                    "invalid_service_id" => $serviceId,
+                    "assigned_category_id" => (int) $assignedCategoryId,
+                ]);
+            }
+        }
+
+        return null;
     }
 }
