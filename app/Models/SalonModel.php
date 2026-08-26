@@ -24,62 +24,73 @@ class SalonModel extends Model
 
     public $timestamps = false;
 
+    public static function salonEmailExists($email, $excludeSalonId = null): bool
+    {
+        logger()->info('Checking if salon email exists: ' . $email . ', excluding salon ID: ' . $excludeSalonId);
+        $query = DB::table('salon')
+            ->where('status', 'Active')
+            ->whereRaw(
+                'LOWER(TRIM(email)) = LOWER(?)',
+                [trim($email)]
+            );
+
+        if (!empty($excludeSalonId)) {
+            $query->where(
+                'salon_id',
+                '!=',
+                $excludeSalonId
+            );
+        }
+
+        return $query->exists();
+    }
+
     public static function addSalon($insert, $device_type = null)
     {
-        try {
-            DB::beginTransaction();
-            $result = DB::table('salon')->insert($insert);
-            $id = DB::getPdo()->lastInsertId();
-            if (!empty($id)) {
-                $token = array(
-                    'salon_token' => generateToken(),
-                    'salon_id' => $id,
-                    'device_type' => $device_type,
-                );
-                DB::table('salon_authentication')->insert($token);
-            }
-            DB::commit();
-            return $id;
-        } catch (\Exception $e) {
-            // An error occurred, rollback the transaction
-            return response()->json(['result' => -1, 'msg' => $e->getMessage()])->send();
-            DB::rollback();
+        $id = DB::table('salon')->insertGetId($insert);
+
+        if (!empty($id)) {
+            DB::table('salon_authentication')->insert([
+                'salon_token' => generateToken(),
+                'salon_id' => $id,
+                'device_type' => $device_type,
+            ]);
         }
+
+        return $id;
     }
 
-    public static function updateSalon($update, $salon_id)
+    public static function addSalonCategory(array $insert)
     {
-        try {
-            DB::beginTransaction();
-            $result = DB::table('salon')->where('salon_id', $salon_id)->update($update);
-            DB::commit();
+        return DB::table('salon_categories')
+            ->insertGetId($insert);
+    }
+
+    public static function addSalonServices(array $services)
+    {
+        if (empty($services)) {
             return true;
-        } catch (\Exception $e) {
-            // An error occurred, rollback the transaction
-            return response()->json(['result' => -1, 'msg' => $e->getMessage()])->send();
-            DB::rollback();
         }
+
+        return DB::table('salon_services')
+            ->insert($services);
     }
-    public static function getSalonDetails($salon_id, $lang = null)
-    {
-        try {
 
-            $data = DB::table('salon');
-
-            // if (!empty($lang)) {
-            //     $data->select('salon_name_' . $lang . ' as salon_name', 'salon_id'); // Replace 'other_attributes' with actual column names
-            // }
-
-            $result = $data->where('salon_id', $salon_id)
-                ->get()
-                ->first();
-
-            return $result;
-        } catch (\Exception $e) {
-            // An error occurred, return a JSON response
-            return response()->json(['result' => -1, 'msg' => $e->getMessage()]);
-        }
+    public static function updateSalon(array $update,$salonId): int {
+        return DB::table('salon')
+            ->where('salon_id', $salonId)
+            ->update($update);
     }
+
+    public static function getSalonDetails(
+    $salonId,
+    $lang = null
+    ) {
+        return DB::table('salon')
+            ->where('salon_id', $salonId)
+            ->first();
+    }
+
     public static function getAllSalons($paginate = false, $user = null, $user_id = null)
     {
         try {
@@ -107,6 +118,76 @@ class SalonModel extends Model
             DB::rollback();
             return response()->json(['result' => -1, 'msg' => $e->getMessage()]);
         }
+    }
+
+    public static function deleteSalonCategories(
+    $salonId
+    ): int {
+        return DB::table('salon_categories')
+            ->where('salon_id', $salonId)
+            ->delete();
+    }
+
+    public static function deleteSalonServices(
+    $salonId
+    ): int {
+        return DB::table('salon_services')
+            ->where('salon_id', $salonId)
+            ->delete();
+    }
+
+    public static function getSalonCategories($salonId) {
+        return DB::table('salon_categories')
+            ->leftJoin(
+                'categories',
+                'categories.id',
+                '=',
+                'salon_categories.category_id'
+            )
+            ->select(
+                'salon_categories.salon_category_id',
+                'salon_categories.category_id',
+                'salon_categories.booking_slots',
+                'salon_categories.status',
+                'categories.name as category_name',
+                'categories.booking_type'
+            )
+            ->where(
+                'salon_categories.salon_id',
+                $salonId
+            )
+            ->where(
+                'salon_categories.status',
+                'Active'
+            )
+            ->get();
+    }
+
+    public static function getSalonServiceIdsByCategory($salonId,$categoryId) {
+        return DB::table('salon_services')
+            ->join(
+                'services',
+                'services.service_id',
+                '=',
+                'salon_services.service_id'
+            )
+            ->where(
+                'salon_services.salon_id',
+                $salonId
+            )
+            ->where(
+                'services.category_id',
+                $categoryId
+            )
+            ->pluck(
+                'salon_services.service_id'
+            );
+    }
+
+    public static function getSalonServiceIds($salonId) {
+        return DB::table('salon_services')
+            ->where('salon_id', $salonId)
+            ->pluck('service_id');
     }
 
 

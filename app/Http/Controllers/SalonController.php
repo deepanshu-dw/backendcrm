@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\SalonModel;
+use App\Models\CategoryModel;
+use App\Models\ServiceModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -103,228 +105,1711 @@ class SalonController extends Controller
 
     public function addSalonV2(Request $request)
     {
-		try {
-			// Validate the request data using Laravel's Validator
-			$validator = Validator::make($request->all(), [
-				'salon_name_en' => 'required',
-				'salon_name_es' => 'required',
-				'salon_name_pl' => 'required',
-				'salon_address_en' => 'required',
-				'email' => 'required|email|unique:users',
-				'password' => 'required|min:6',
-			], [
-				'required' => 'This :attribute is required',
-				'unique' => 'The :attribute has already been taken',
-				'min' => 'The :attribute must be at least :min characters long'
-			]);
-
-			// If validation fails, return an error response
-			if ($validator->fails()) {
-				return response()->json(['result' => 0, 'errors' => $validator->errors()->first()], 400);
-			}
-
-            $admin_id = $request->input('admin_id');
-
-            $thumbnail_image = null;
-            if (!empty($request->hasfile('salon_thumbnail'))) {
-                $thumbnail_image = singleAwsUpload($request, 'salon_thumbnail');
-            }
-            $rand = rand(1111, 9999);
-            $password = $request->post('password');
-            $user_name = 'hollywood' . $rand;
-            $insert = [
-                'salon_name_en' => $request->post('salon_name_en'),
-                'salon_name_es' => $request->post('salon_name_es'),
-                'salon_name_pl' => $request->post('salon_name_pl'),
-                'salon_address_en' => $request->post('salon_address_en'),
-                'salon_address_es' => $request->post('salon_address_es'),
-                'salon_address_pl' => $request->post('salon_address_pl'),
-                'phone_no' => $request->post('phone_no'),
-                'user_name' => $user_name,
-                'email' => $request->post('email'),
-                'city_es' => $request->post('city_es'),
-                'city_en' => $request->post('city_en'),
-                'city_pl' => $request->post('city_pl'),
-                'password' => hash('sha256', $request->post('password')),
-                'opening_time' => $request->post('opening_time'),
-                'closing_time' => $request->post('closing_time'),
-                'salon_thumbnail' => $thumbnail_image,
-                'latitude' => $request->post('latitude'),
-                'longitude' => $request->post('longitude'),
-				'location' => $request->post('location')
-            ];
-            $device_type = $request->post('device_type');
-            $result = SalonModel::addSalon($insert, $device_type);
-
-            if ($result) {
-                 DB::table('activity_logs')->insert([
-                'admin_id'   => $admin_id,
-                'action'     => 'Salon Added',
-                'description'=> "New Salon created: {$insert['salon_name_en']}",
-                'created_at' => now(),
-		        ]);
-                $services = $request->post('services_ids');
-                if (!empty($services)) {
-                    foreach ($services as $val) {
-                        $temp['salon_id'] = $result;
-                        $temp['service_id'] = $val;
-                        insert('salon_services', $temp);
-                    }
-                }
-
-                $maildata['to'] = $request->post('email');
-                $maildata['subject'] = 'Activation Salon and Credentials';
-                $maildata['view_name'] = 'welcome';
-                $maildata['name'] = $request->post('salon_name_en');
-                $maildata['email'] = $request->post('email');
-                $maildata['password'] = $password;
-                $maildata['user_name'] = $user_name;
-                if (!empty($maildata['email'])) {
-					sendMail($maildata);
-				}
-                return response()->json(['result' => 1, 'msg' => 'Salon Added successfull', 'data' => $result]);
-            } else {
-                return response()->json(['result' => -1, 'msg' => 'Salon not added ']);
-            }
-        } catch (\Exception $e) {
-            return response()->json(['result' => -1, 'msg' => $e->getMessage()]);
-        }
-    }
-
-    public function updateSalon(Request $request, $salon_id)
-    {
-        // Validate the request data using Laravel's Validator
-        $validator = Validator::make($request->all(), [
-            'salon_name_en' => 'required|string',
-            'salon_name_en' => 'required|string',
-            'salon_name_en' => 'required|string',
-            'salon_address_en' => 'required|string',
-            'email' => 'required|email|unique:users',
-            // 'password' => 'required|min:6',
-        ], [
-            'required' => 'This :attribute is required',
-            'unique' => 'The :attribute has already been taken',
-        ]);
-
-        // If validation fails, return an error response
-        if ($validator->fails()) {
-            return response()->json(['result' => 0, 'errors' => $validator->errors()], 400);
-        }
-
-        $admin_id = $request->post('admin_id');
-
-        //return response()->json(['result' => 1, 'services_ids' => $request->post('services_ids')]);
         try {
-            $olddata = SalonModel::getSalonDetails($salon_id);
-            if (!empty($request->hasfile('salon_thumbnail'))) {
-                $thumbnail_image = singleAwsUpload($request, 'salon_thumbnail');
-            } else {
-                $thumbnail_image = @$olddata->salon_thumbnail;
-            }
-            // $rand = rand(1111, 9999);
-            // $user_name = 'hollywood' . $rand;
-            $pass = $request->post('password');
-            $update = [
-                'salon_name_en' => $request->post('salon_name_en'),
-                'salon_name_es' => $request->post('salon_name_es'),
-                'salon_name_pl' => $request->post('salon_name_pl'),
-                'salon_address_en' => $request->post('salon_address_en'),
-                'salon_address_es' => $request->post('salon_address_es'),
-                'salon_address_pl' => $request->post('salon_address_pl'),
-                'city_es' => $request->post('city_es'),
-                'city_en' => $request->post('city_en'),
-                'city_pl' => $request->post('city_pl'),
-                'phone_no' => $request->post('phone_no'),
-                'email' => $request->post('email'),
-                'opening_time' => $request->post('opening_time'),
-                'closing_time' => $request->post('closing_time'),
-                'salon_thumbnail' => $thumbnail_image,
-                'latitude' => $request->post('latitude'),
-                'longitude' => $request->post('longitude'),
-				'location' => $request->post('location')
-            ];
-            if (!empty($pass)) {
-                $update['password'] = hash('sha256', $pass);
-            }
-            $device_type = $request->post('device_type');
-            $result = SalonModel::updateSalon($update, $salon_id);
 
-            if ($result) {
-                 DB::table('activity_logs')->insert([
-                'admin_id'   => $admin_id,
-                'action'     => 'Salon Updated',
-                'description'=> "Salon Updated: {$update['salon_name_en']}",
-                'created_at' => now(),
-		        ]);
-                $services = $request->post('services_ids');
-                if (!empty($services)) {
-					delete('salon_services', 'salon_id', $salon_id);
-                    foreach ($services as $val) {
-                        $temp['salon_id'] = $salon_id;
-                        $temp['service_id'] = $val;
-                        insert('salon_services', $temp);
+            $categories = $request->input('categories');
+
+            if (is_string($categories)) {
+
+                $categories = json_decode(
+                    $categories,
+                    true
+                );
+
+                if (
+                    json_last_error() !==
+                    JSON_ERROR_NONE
+                ) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' => 'Invalid categories format.'
+                    ], 400);
+                }
+
+                $request->merge([
+                    'categories' => $categories
+                ]);
+            }
+
+
+            /*
+            * Main request validation.
+            *
+            * Salon opening/closing time MUST be:
+            * h:i A
+            *
+            * Example:
+            * 09:00 AM
+            * 06:00 PM
+            *
+            * Booking slots remain H:i because the
+            * existing slot validation logic expects
+            * 24-hour format.
+            */
+            $validator = Validator::make(
+                $request->all(),
+                [
+                    'salon_name_en' => 'required',
+                    'salon_name_es' => 'required',
+                    'salon_name_pl' => 'required',
+
+                    'salon_address_en' => 'required',
+
+                    'email' => 'required|email',
+
+                    'password' =>
+                        'required|min:6',
+
+                    'opening_time' =>
+                        'required|date_format:h:i A',
+
+                    'closing_time' =>
+                        'required|date_format:h:i A',
+
+                    /*
+                    * Category configurations.
+                    */
+                    'categories' =>
+                        'required|array|min:1',
+
+                    'categories.*.category_id' =>
+                        'required|integer',
+
+                    'categories.*.service_ids' =>
+                        'required|array|min:1',
+
+                    'categories.*.service_ids.*' =>
+                        'required|integer',
+
+                    'categories.*.booking_slots' =>
+                        'required|array|min:1',
+
+                    'categories.*.booking_slots.*.start_time' =>
+                        'required|date_format:H:i',
+
+                    'categories.*.booking_slots.*.end_time' =>
+                        'nullable|date_format:H:i',
+                ],
+                [
+                    'required' =>
+                        'This :attribute is required',
+
+                    'unique' =>
+                        'The :attribute has already been taken',
+
+                    'min' =>
+                        'The :attribute must be at least :min characters long',
+
+                    'date_format' =>
+                        'The :attribute must be in HH:MM AM/PM format'
+                ]
+            );
+
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'result' => 0,
+                    'errors' =>
+                        $validator->errors()->first()
+                ], 400);
+            }
+
+
+            $email = trim(
+                $request->input('email')
+            );
+
+
+            if (SalonModel::salonEmailExists($email)) {
+                return response()->json([
+                    'result' => 0,
+                    'msg' =>
+                        'Salon for this email already exists.'
+                ], 400);
+            }
+
+
+            /*
+            * Salon opening/closing time.
+            *
+            * Input is mandatory AM/PM format:
+            *
+            * 09:00 AM
+            * 06:00 PM
+            *
+            * Convert to 24-hour format ONLY for
+            * comparison and slot validation.
+            */
+            $openingTime =
+                strtoupper(
+                    trim(
+                        $request->input(
+                            'opening_time'
+                        )
+                    )
+                );
+
+            $closingTime =
+                strtoupper(
+                    trim(
+                        $request->input(
+                            'closing_time'
+                        )
+                    )
+                );
+
+
+            $openingTime24 =
+                \Carbon\Carbon::createFromFormat(
+                    'h:i A',
+                    $openingTime
+                )->format('H:i');
+
+
+            $closingTime24 =
+                \Carbon\Carbon::createFromFormat(
+                    'h:i A',
+                    $closingTime
+                )->format('H:i');
+
+
+            /*
+            * Salon closing time validation.
+            */
+            if (
+                $closingTime24 <=
+                $openingTime24
+            ) {
+                return response()->json([
+                    'result' => 0,
+                    'msg' =>
+                        'Closing time must be greater than opening time.'
+                ], 400);
+            }
+
+
+            /*
+            * Normalize AM/PM format before storing.
+            *
+            * Example:
+            * 09:00 AM -> 09:00 AM
+            * 06:00 PM -> 06:00 PM
+            */
+            $openingTime =
+                \Carbon\Carbon::createFromFormat(
+                    'H:i',
+                    $openingTime24
+                )->format('h:i A');
+
+
+            $closingTime =
+                \Carbon\Carbon::createFromFormat(
+                    'H:i',
+                    $closingTime24
+                )->format('h:i A');
+
+
+            /*
+            * This array will hold already validated
+            * category configurations.
+            */
+            $categoryConfigurations = [];
+
+            $usedCategoryIds = [];
+
+
+            /*
+            * Validate complete category/service/slot
+            * configuration before inserting anything.
+            */
+            foreach ($categories as $categoryData) {
+
+                $categoryId =
+                    (int) $categoryData['category_id'];
+
+
+                if (
+                    in_array(
+                        $categoryId,
+                        $usedCategoryIds,
+                        true
+                    )
+                ) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "Category {$categoryId} has been selected more than once."
+                    ], 400);
+                }
+
+
+                $usedCategoryIds[] =
+                    $categoryId;
+
+
+                /*
+                * getCategoryById() already returns
+                * only Active category.
+                */
+                $category =
+                    CategoryModel::getCategoryById(
+                        $categoryId
+                    );
+
+
+                if (!$category) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "Category {$categoryId} not found or inactive."
+                    ], 400);
+                }
+
+
+                /*
+                * Normalize service IDs.
+                */
+                $serviceIds = array_values(
+                    array_unique(
+                        array_map(
+                            'intval',
+                            $categoryData['service_ids']
+                        )
+                    )
+                );
+
+
+                if (empty($serviceIds)) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "Please select at least one service for {$category->name}."
+                    ], 400);
+                }
+
+
+                /*
+                * Validate services using ServiceModel.
+                */
+                $validServices =
+                    ServiceModel::getActiveServicesByCategoryAndIds(
+                        $categoryId,
+                        $serviceIds
+                    );
+
+
+                if (
+                    $validServices->count() !==
+                    count($serviceIds)
+                ) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "One or more selected services are invalid for {$category->name}."
+                    ], 400);
+                }
+
+
+                /*
+                * Validate category slots.
+                *
+                * Existing booking slots remain H:i.
+                *
+                * Salon opening/closing times are passed
+                * as H:i only for validation.
+                */
+                $slotValidation =
+                    $this->validateSalonCategorySlots(
+                        $category->booking_type,
+                        $categoryData['booking_slots'],
+                        $openingTime24,
+                        $closingTime24
+                    );
+
+
+                if ($slotValidation !== null) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "{$category->name}: {$slotValidation}"
+                    ], 400);
+                }
+
+
+                /*
+                * Store normalized configuration.
+                *
+                * Booking slots are NOT changed.
+                */
+                $categoryConfigurations[] = [
+
+                    'category_id' =>
+                        $categoryId,
+
+                    'service_ids' =>
+                        $serviceIds,
+
+                    'booking_slots' =>
+                        array_values(
+                            $categoryData['booking_slots']
+                        )
+                ];
+            }
+
+
+            /*
+            * Upload salon thumbnail only after
+            * all request validations pass.
+            */
+            $thumbnailImage = null;
+
+            if (
+                $request->hasFile(
+                    'salon_thumbnail'
+                )
+            ) {
+                $thumbnailImage =
+                    singleAwsUpload(
+                        $request,
+                        'salon_thumbnail'
+                    );
+            }
+
+
+            /*
+            * Existing credential generation logic.
+            */
+            $rand =
+                rand(1111, 9999);
+
+            $password =
+                $request->post('password');
+
+            $userName =
+                'hollywood' . $rand;
+
+
+            /*
+            * Existing salon data.
+            */
+            $insert = [
+
+                'salon_name_en' =>
+                    $request->post('salon_name_en'),
+
+                'salon_name_es' =>
+                    $request->post('salon_name_es'),
+
+                'salon_name_pl' =>
+                    $request->post('salon_name_pl'),
+
+                'salon_address_en' =>
+                    $request->post('salon_address_en'),
+
+                'salon_address_es' =>
+                    $request->post('salon_address_es'),
+
+                'salon_address_pl' =>
+                    $request->post('salon_address_pl'),
+
+                'phone_no' =>
+                    $request->post('phone_no'),
+
+                'user_name' =>
+                    $userName,
+
+                'email' =>
+                    $email,
+
+                'city_es' =>
+                    $request->post('city_es'),
+
+                'city_en' =>
+                    $request->post('city_en'),
+
+                'city_pl' =>
+                    $request->post('city_pl'),
+
+                'country' =>
+                    $request->post('country'),
+
+                'password' =>
+                    hash(
+                        'sha256',
+                        $request->post('password')
+                    ),
+
+                /*
+                * Store salon times in AM/PM format.
+                */
+                'opening_time' =>
+                    $openingTime,
+
+                'closing_time' =>
+                    $closingTime,
+
+                'salon_thumbnail' =>
+                    $thumbnailImage,
+
+                'latitude' =>
+                    $request->post('latitude'),
+
+                'longitude' =>
+                    $request->post('longitude'),
+
+                'location' =>
+                    $request->post('location')
+            ];
+
+
+            $deviceType =
+                $request->post('device_type');
+
+            $adminId =
+                $request->input('admin_id');
+
+
+            /*
+            * Complete salon creation should be atomic.
+            */
+            DB::beginTransaction();
+
+
+            try {
+
+                /*
+                * Creates:
+                *
+                * salon
+                * salon_authentication
+                */
+                $salonId =
+                    SalonModel::addSalon(
+                        $insert,
+                        $deviceType
+                    );
+
+
+                if (empty($salonId)) {
+                    throw new \Exception(
+                        'Salon not added.'
+                    );
+                }
+
+
+                /*
+                * Collect all salon services.
+                */
+                $salonServices = [];
+
+
+                foreach (
+                    $categoryConfigurations
+                    as $categoryConfiguration
+                ) {
+
+                    /*
+                    * Salon -> Category mapping.
+                    */
+                    $salonCategoryInsert = [
+
+                        'salon_id' =>
+                            $salonId,
+
+                        'category_id' =>
+                            $categoryConfiguration[
+                                'category_id'
+                            ],
+
+                        'booking_slots' =>
+                            json_encode(
+                                $categoryConfiguration[
+                                    'booking_slots'
+                                ]
+                            ),
+
+                        'status' =>
+                            'Active',
+
+                        'created_at' =>
+                            now(),
+
+                        'updated_at' =>
+                            now()
+                    ];
+
+
+                    SalonModel::addSalonCategory(
+                        $salonCategoryInsert
+                    );
+
+
+                    /*
+                    * Prepare service mappings.
+                    */
+                    foreach (
+                        $categoryConfiguration['service_ids']
+                        as $serviceId
+                    ) {
+
+                        $salonServices[] = [
+                            'salon_id' =>
+                                $salonId,
+
+                            'service_id' =>
+                                $serviceId
+                        ];
                     }
                 }
-                return response()->json(['result' => 1, 'msg' => 'Salon Updated successfull', 'data' => $result]);
+
+
+                /*
+                * Normalize service duplicates.
+                */
+                $uniqueSalonServices = [];
+
+                $usedServiceIds = [];
+
+
+                foreach (
+                    $salonServices
+                    as $salonService
+                ) {
+
+                    $serviceId =
+                        (int) $salonService['service_id'];
+
+
+                    if (
+                        !in_array(
+                            $serviceId,
+                            $usedServiceIds,
+                            true
+                        )
+                    ) {
+
+                        $usedServiceIds[] =
+                            $serviceId;
+
+                        $uniqueSalonServices[] =
+                            $salonService;
+                    }
+                }
+
+
+                /*
+                * Bulk insert salon services.
+                */
+                if (!empty($uniqueSalonServices)) {
+
+                    SalonModel::addSalonServices(
+                        $uniqueSalonServices
+                    );
+                }
+
+
+                /*
+                * Existing activity log.
+                */
+                DB::table(
+                    'activity_logs'
+                )->insert([
+
+                    'admin_id' =>
+                        $adminId,
+
+                    'action' =>
+                        'Salon Added',
+
+                    'description' =>
+                        "New Salon created: {$insert['salon_name_en']}",
+
+                    'created_at' =>
+                        now()
+                ]);
+
+
+                DB::commit();
+
+
+            } catch (\Throwable $e) {
+
+                DB::rollBack();
+
+                throw $e;
+            }
+
+
+            /*
+            * Email happens after successful DB commit.
+            */
+            try {
+
+                $maildata = [
+
+                    'to' =>
+                        $request->post('email'),
+
+                    'subject' =>
+                        'Activation Salon and Credentials',
+
+                    'view_name' =>
+                        'welcome',
+
+                    'name' =>
+                        $request->post(
+                            'salon_name_en'
+                        ),
+
+                    'email' =>
+                        $request->post('email'),
+
+                    'password' =>
+                        $password,
+
+                    'user_name' =>
+                        $userName
+                ];
+
+
+                if (!empty($maildata['email'])) {
+                    sendMail($maildata);
+                }
+
+
+            } catch (\Throwable $mailException) {
+
+                \Log::error(
+                    'Salon activation email failed: ' .
+                    $mailException->getMessage()
+                );
+            }
+
+
+            return response()->json([
+                'result' => 1,
+                'msg' =>
+                    'Salon Added successfully',
+                'data' =>
+                    $salonId
+            ]);
+
+
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'result' => -1,
+                'msg' =>
+                    $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    public function updateSalon(
+        Request $request,
+        $salon_id
+    ) {
+        try {
+
+            /*
+            * Decode categories because request can be
+            * multipart/form-data.
+            */
+            $categories =
+                $request->input('categories');
+
+
+            if (is_string($categories)) {
+
+                $categories =
+                    json_decode(
+                        $categories,
+                        true
+                    );
+
+
+                if (
+                    json_last_error() !==
+                    JSON_ERROR_NONE
+                ) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            'Invalid categories format.'
+                    ], 400);
+                }
+
+
+                $request->merge([
+                    'categories' =>
+                        $categories
+                ]);
+            }
+
+
+            /*
+            * Request validation.
+            *
+            * Salon opening/closing time MUST be:
+            * h:i A
+            *
+            * Example:
+            * 09:00 AM
+            * 06:00 PM
+            */
+            $validator = Validator::make(
+                $request->all(),
+                [
+                    'salon_name_en' =>
+                        'required|string',
+
+                    'salon_name_es' =>
+                        'required|string',
+
+                    'salon_name_pl' =>
+                        'required|string',
+
+                    'salon_address_en' =>
+                        'required|string',
+
+                    'email' =>
+                        'required|email',
+
+                    'password' =>
+                        'nullable|min:6',
+
+                    'opening_time' =>
+                        'required|date_format:h:i A',
+
+                    'closing_time' =>
+                        'required|date_format:h:i A',
+
+                    'categories' =>
+                        'required|array|min:1',
+
+                    'categories.*.category_id' =>
+                        'required|integer',
+
+                    'categories.*.service_ids' =>
+                        'required|array|min:1',
+
+                    'categories.*.service_ids.*' =>
+                        'required|integer',
+
+                    'categories.*.booking_slots' =>
+                        'required|array|min:1',
+
+                    /*
+                    * Booking slots remain H:i.
+                    */
+                    'categories.*.booking_slots.*.start_time' =>
+                        'required|date_format:H:i',
+
+                    'categories.*.booking_slots.*.end_time' =>
+                        'nullable|date_format:H:i',
+                ],
+                [
+                    'required' =>
+                        'This :attribute is required',
+
+                    'min' =>
+                        'The :attribute must be at least :min characters long',
+
+                    'date_format' =>
+                        'The :attribute must be in HH:MM format'
+                ]
+            );
+
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'result' => 0,
+                    'errors' =>
+                        $validator->errors()->first()
+                ], 400);
+            }
+
+
+            /*
+            * Make sure salon exists.
+            */
+            $oldData =
+                SalonModel::getSalonDetails(
+                    $salon_id
+                );
+
+
+            if (!$oldData) {
+                return response()->json([
+                    'result' => 0,
+                    'msg' =>
+                        'Salon not found.'
+                ], 404);
+            }
+
+
+            $email =
+                trim(
+                    $request->input('email')
+                );
+
+
+            if (
+                SalonModel::salonEmailExists(
+                    $email,
+                    $salon_id
+                )
+            ) {
+                return response()->json([
+                    'result' => 0,
+                    'msg' =>
+                        'Salon for this email already exists.'
+                ], 400);
+            }
+
+
+            /*
+            * Salon opening/closing time.
+            *
+            * AM/PM is mandatory because validation
+            * requires h:i A.
+            */
+            $openingTime =
+                strtoupper(
+                    trim(
+                        $request->input(
+                            'opening_time'
+                        )
+                    )
+                );
+
+
+            $closingTime =
+                strtoupper(
+                    trim(
+                        $request->input(
+                            'closing_time'
+                        )
+                    )
+                );
+
+
+            /*
+            * Convert to 24-hour format only for
+            * comparison and existing slot validation.
+            */
+            $openingTime24 =
+                \Carbon\Carbon::createFromFormat(
+                    'h:i A',
+                    $openingTime
+                )->format('H:i');
+
+
+            $closingTime24 =
+                \Carbon\Carbon::createFromFormat(
+                    'h:i A',
+                    $closingTime
+                )->format('H:i');
+
+
+            if (
+                $closingTime24 <=
+                $openingTime24
+            ) {
+                return response()->json([
+                    'result' => 0,
+                    'msg' =>
+                        'Closing time must be greater than opening time.'
+                ], 400);
+            }
+
+
+            /*
+            * Normalize salon times to AM/PM
+            * before storing.
+            */
+            $openingTime =
+                \Carbon\Carbon::createFromFormat(
+                    'H:i',
+                    $openingTime24
+                )->format('h:i A');
+
+
+            $closingTime =
+                \Carbon\Carbon::createFromFormat(
+                    'H:i',
+                    $closingTime24
+                )->format('h:i A');
+
+
+            /*
+            * Validate complete category configuration
+            * before updating DB.
+            */
+            $categoryConfigurations = [];
+
+            $usedCategoryIds = [];
+
+
+            foreach (
+                $categories
+                as $categoryData
+            ) {
+
+                $categoryId =
+                    (int) $categoryData[
+                        'category_id'
+                    ];
+
+
+                /*
+                * Duplicate category.
+                */
+                if (
+                    in_array(
+                        $categoryId,
+                        $usedCategoryIds,
+                        true
+                    )
+                ) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "Category {$categoryId} has been selected more than once."
+                    ], 400);
+                }
+
+
+                $usedCategoryIds[] =
+                    $categoryId;
+
+
+                /*
+                * Active category validation.
+                */
+                $category =
+                    CategoryModel::getCategoryById(
+                        $categoryId
+                    );
+
+
+                if (!$category) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "Category {$categoryId} not found or inactive."
+                    ], 400);
+                }
+
+
+                /*
+                * Normalize service IDs.
+                */
+                $serviceIds =
+                    array_values(
+                        array_unique(
+                            array_map(
+                                'intval',
+                                $categoryData[
+                                    'service_ids'
+                                ]
+                            )
+                        )
+                    );
+
+
+                if (empty($serviceIds)) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "Please select at least one service for {$category->name}."
+                    ], 400);
+                }
+
+
+                /*
+                * Validate service/category relation.
+                */
+                $validServices =
+                    ServiceModel::getActiveServicesByCategoryAndIds(
+                        $categoryId,
+                        $serviceIds
+                    );
+
+
+                if (
+                    $validServices->count() !==
+                    count($serviceIds)
+                ) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "One or more selected services are invalid for {$category->name}."
+                    ], 400);
+                }
+
+
+                /*
+                * Validate fixed/window slots.
+                *
+                * Existing booking slots remain H:i.
+                *
+                * Salon opening/closing times are passed
+                * as H:i for the existing validator.
+                */
+                $slotValidation =
+                    $this->validateSalonCategorySlots(
+                        $category->booking_type,
+                        $categoryData[
+                            'booking_slots'
+                        ],
+                        $openingTime24,
+                        $closingTime24
+                    );
+
+
+                if (
+                    $slotValidation !== null
+                ) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' =>
+                            "{$category->name}: {$slotValidation}"
+                    ], 400);
+                }
+
+
+                $categoryConfigurations[] = [
+
+                    'category_id' =>
+                        $categoryId,
+
+                    'service_ids' =>
+                        $serviceIds,
+
+                    /*
+                    * Booking slots are unchanged.
+                    */
+                    'booking_slots' =>
+                        array_values(
+                            $categoryData[
+                                'booking_slots'
+                            ]
+                        )
+                ];
+            }
+
+
+            /*
+            * Thumbnail.
+            */
+            if (
+                $request->hasFile(
+                    'salon_thumbnail'
+                )
+            ) {
+
+                $thumbnailImage =
+                    singleAwsUpload(
+                        $request,
+                        'salon_thumbnail'
+                    );
+
             } else {
-                return response()->json(['result' => -1, 'msg' => 'No changes updated ']);
+
+                $thumbnailImage =
+                    $oldData->salon_thumbnail;
             }
-        } catch (\Exception $e) {
-            return response()->json(['result' => -1, 'msg' => $e->getMessage()]);
+
+
+            /*
+            * Main salon update.
+            */
+            $update = [
+
+                'salon_name_en' =>
+                    $request->post(
+                        'salon_name_en'
+                    ),
+
+                'salon_name_es' =>
+                    $request->post(
+                        'salon_name_es'
+                    ),
+
+                'salon_name_pl' =>
+                    $request->post(
+                        'salon_name_pl'
+                    ),
+
+                'salon_address_en' =>
+                    $request->post(
+                        'salon_address_en'
+                    ),
+
+                'salon_address_es' =>
+                    $request->post(
+                        'salon_address_es'
+                    ),
+
+                'salon_address_pl' =>
+                    $request->post(
+                        'salon_address_pl'
+                    ),
+
+                'city_es' =>
+                    $request->post('city_es'),
+
+                'city_en' =>
+                    $request->post('city_en'),
+
+                'city_pl' =>
+                    $request->post('city_pl'),
+
+                'phone_no' =>
+                    $request->post('phone_no'),
+
+                'email' =>
+                    $email,
+
+                /*
+                * Store salon times in AM/PM format.
+                */
+                'opening_time' =>
+                    $openingTime,
+
+                'closing_time' =>
+                    $closingTime,
+
+                'salon_thumbnail' =>
+                    $thumbnailImage,
+
+                'latitude' =>
+                    $request->post('latitude'),
+
+                'longitude' =>
+                    $request->post('longitude'),
+
+                'location' =>
+                    $request->post('location'),
+
+                'country' =>
+                    $request->post('country')
+            ];
+
+
+            /*
+            * Password is optional during update.
+            */
+            $password =
+                $request->post('password');
+
+
+            if (!empty($password)) {
+
+                $update['password'] =
+                    hash(
+                        'sha256',
+                        $password
+                    );
+            }
+
+
+            $adminId =
+                $request->post('admin_id');
+
+
+            /*
+            * Complete update transaction.
+            */
+            DB::beginTransaction();
+
+
+            try {
+
+                /*
+                * Update salon master information.
+                */
+                SalonModel::updateSalon(
+                    $update,
+                    $salon_id
+                );
+
+
+                /*
+                * Replace old mappings.
+                */
+                SalonModel::deleteSalonServices(
+                    $salon_id
+                );
+
+
+                SalonModel::deleteSalonCategories(
+                    $salon_id
+                );
+
+
+                $salonServices = [];
+
+
+                foreach (
+                    $categoryConfigurations
+                    as $categoryConfiguration
+                ) {
+
+                    /*
+                    * Recreate salon category.
+                    */
+                    SalonModel::addSalonCategory([
+                        'salon_id' =>
+                            $salon_id,
+
+                        'category_id' =>
+                            $categoryConfiguration[
+                                'category_id'
+                            ],
+
+                        'booking_slots' =>
+                            json_encode(
+                                $categoryConfiguration[
+                                    'booking_slots'
+                                ]
+                            ),
+
+                        'status' =>
+                            'Active',
+
+                        'created_at' =>
+                            now(),
+
+                        'updated_at' =>
+                            now()
+                    ]);
+
+
+                    /*
+                    * Prepare salon services.
+                    */
+                    foreach (
+                        $categoryConfiguration[
+                            'service_ids'
+                        ]
+                        as $serviceId
+                    ) {
+
+                        $salonServices[] = [
+                            'salon_id' =>
+                                $salon_id,
+
+                            'service_id' =>
+                                $serviceId
+                        ];
+                    }
+                }
+
+
+                /*
+                * Remove duplicate service IDs
+                * before inserting.
+                */
+                $uniqueSalonServices = [];
+
+                $usedServiceIds = [];
+
+
+                foreach (
+                    $salonServices
+                    as $salonService
+                ) {
+
+                    $serviceId =
+                        (int) $salonService[
+                            'service_id'
+                        ];
+
+
+                    if (
+                        !in_array(
+                            $serviceId,
+                            $usedServiceIds,
+                            true
+                        )
+                    ) {
+
+                        $usedServiceIds[] =
+                            $serviceId;
+
+                        $uniqueSalonServices[] =
+                            $salonService;
+                    }
+                }
+
+
+                if (
+                    !empty(
+                        $uniqueSalonServices
+                    )
+                ) {
+
+                    SalonModel::addSalonServices(
+                        $uniqueSalonServices
+                    );
+                }
+
+
+                /*
+                * Activity log.
+                */
+                DB::table(
+                    'activity_logs'
+                )->insert([
+
+                    'admin_id' =>
+                        $adminId,
+
+                    'action' =>
+                        'Salon Updated',
+
+                    'description' =>
+                        "Salon Updated: {$update['salon_name_en']}",
+
+                    'created_at' =>
+                        now()
+                ]);
+
+
+                DB::commit();
+
+
+            } catch (\Throwable $e) {
+
+                DB::rollBack();
+
+                throw $e;
+            }
+
+
+            return response()->json([
+                'result' => 1,
+                'msg' =>
+                    'Salon updated successfully.',
+                'data' =>
+                    $salon_id
+            ]);
+
+
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'result' => -1,
+                'msg' =>
+                    $e->getMessage()
+            ], 500);
         }
     }
 
-    public function getSalonDetails(Request $request, $salon_id, $lang = 'en')
-    {
-        $is_admin = $request->input('is_admin');
-        $result = SalonModel::getSalonDetails($salon_id, $lang);
-        
-        if ($lang == 0) {
-            $lang = 'en';
-        }
-        if ($result) {
-            $services = select('salon_services', '*', [['salon_id', '=', $salon_id]])->map(function ($item) {
-                return $item->service_id;
-            })->toArray();
+    public function getSalonDetails(Request $request,$salon_id,$lang = 'en') {
+        try {
 
-            $result->services = SalonModel::getServices($services, $lang, $is_admin);
-            $currency = select('currency', '*', ['country' => $lang])->first();
-            if (!empty($currency->currency_icon)) {
-                $result->currency_icon = $currency->currency_icon;
+            $isAdmin =
+                $request->input('is_admin');
+
+
+            if ($lang == 0) {
+                $lang = 'en';
             }
-			
-			if (isset($result->salon_thumbnail) && !str_contains($result->salon_thumbnail, 'amazonaws.com')) {
-				$result->salon_thumbnail = baseURL($result->salon_thumbnail);
-			}
-			
-            /* foreach ($result->services as $service) {    
-				$subServices =  @SalonModel::getSubserviceByServiceId($service->service_id,$lang);
-				$service->sub_services = $subServices->toArray();
-            } */
 
-            return response()->json(['result' => 1, 'msg' => 'Salon data found', 'data' => $result]);
-        } else {
-            return response()->json(['result' => -1, 'msg' => 'No data found']);
+
+            $result =
+                SalonModel::getSalonDetails(
+                    $salon_id,
+                    $lang
+                );
+
+
+            if (!$result) {
+                return response()->json([
+                    'result' => -1,
+                    'msg' => 'No data found'
+                ]);
+            }
+
+
+            /*
+            * Keep old services response.
+            */
+            $serviceIds =
+                SalonModel::getSalonServiceIds(
+                    $salon_id
+                )
+                ->map(function ($serviceId) {
+                    return (int) $serviceId;
+                })
+                ->toArray();
+
+
+            $result->services =
+                SalonModel::getServices(
+                    $serviceIds,
+                    $lang,
+                    $isAdmin
+                );
+
+
+            /*
+            * New category configuration.
+            */
+            $salonCategories =
+                SalonModel::getSalonCategories(
+                    $salon_id
+                );
+
+
+            foreach (
+                $salonCategories
+                as $category
+            ) {
+
+                /*
+                * Convert DB JSON string back
+                * into proper response array.
+                */
+                $category->booking_slots =
+                    !empty(
+                        $category->booking_slots
+                    )
+                    ? json_decode(
+                        $category->booking_slots,
+                        true
+                    )
+                    : [];
+
+
+                /*
+                * Get services selected under
+                * this category.
+                */
+                $categoryServiceIds =
+                    SalonModel::getSalonServiceIdsByCategory(
+                        $salon_id,
+                        $category->category_id
+                    )
+                    ->map(function ($serviceId) {
+                        return (int) $serviceId;
+                    })
+                    ->toArray();
+
+
+                $category->service_ids =
+                    $categoryServiceIds;
+
+
+                /*
+                * Full services are useful on the
+                * detail/edit screen.
+                */
+                $category->services =
+                    SalonModel::getServices(
+                        $categoryServiceIds,
+                        $lang,
+                        $isAdmin
+                    );
+            }
+
+
+            $result->categories =
+                $salonCategories;
+
+
+            /*
+            * Existing currency logic.
+            */
+            $currency =
+                select(
+                    'currency',
+                    '*',
+                    [
+                        'country' =>
+                            $lang
+                    ]
+                )->first();
+
+
+            if (
+                !empty(
+                    $currency->currency_icon
+                )
+            ) {
+                $result->currency_icon =
+                    $currency->currency_icon;
+            }
+
+
+            /*
+            * Existing thumbnail logic.
+            */
+            if (
+                isset(
+                    $result->salon_thumbnail
+                ) &&
+                !str_contains(
+                    $result->salon_thumbnail,
+                    'amazonaws.com'
+                )
+            ) {
+                $result->salon_thumbnail =
+                    baseURL(
+                        $result->salon_thumbnail
+                    );
+            }
+
+
+            return response()->json([
+                'result' => 1,
+                'msg' =>
+                    'Salon data found',
+                'data' =>
+                    $result
+            ]);
+
+
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'result' => -1,
+                'msg' => $e->getMessage()
+            ], 500);
         }
     }
 
-    public function getAllSalons(Request $request)
-    {
-        $user = !empty($request->query('u')) ? $request->query('u') : null;
-		$user_id = !empty($request->query('uid')) ? $request->query('uid') : null;
-		$paginate = $request->query('paginate');
-        $result = SalonModel::getAllSalons($paginate, $user, $user_id);
+    public function getAllSalons(
+        Request $request
+    ) {
+        try {
 
-        if (!empty($result)) {
+            $user =
+                !empty(
+                    $request->query('u')
+                )
+                ? $request->query('u')
+                : null;
+
+
+            $userId =
+                !empty(
+                    $request->query('uid')
+                )
+                ? $request->query('uid')
+                : null;
+
+
+            $paginate =
+                $request->query('paginate');
+
+
+            $result =
+                SalonModel::getAllSalons(
+                    $paginate,
+                    $user,
+                    $userId
+                );
+
+
+            if (empty($result)) {
+                return response()->json([
+                    'result' => -1,
+                    'msg' => 'No data found'
+                ]);
+            }
+
+
+            /*
+            * Works with both Collection and
+            * Laravel paginator.
+            */
             foreach ($result as $row) {
-                if (isset($row->salon_thumbnail) && !str_contains($row->salon_thumbnail, 'amazonaws.com')) {
-					$row->salon_thumbnail = baseURL($row->salon_thumbnail);
-				}
+
+                /*
+                * Existing thumbnail behavior.
+                */
+                if (
+                    isset(
+                        $row->salon_thumbnail
+                    ) &&
+                    !str_contains(
+                        $row->salon_thumbnail,
+                        'amazonaws.com'
+                    )
+                ) {
+
+                    $row->salon_thumbnail =
+                        baseURL(
+                            $row->salon_thumbnail
+                        );
+                }
+
+
+                /*
+                * New category configurations.
+                */
+                $categories =
+                    SalonModel::getSalonCategories(
+                        $row->salon_id
+                    );
+
+
+                foreach (
+                    $categories
+                    as $category
+                ) {
+
+                    $category->booking_slots =
+                        !empty(
+                            $category->booking_slots
+                        )
+                        ? json_decode(
+                            $category->booking_slots,
+                            true
+                        )
+                        : [];
+
+
+                    $category->service_ids =
+                        SalonModel::getSalonServiceIdsByCategory(
+                            $row->salon_id,
+                            $category->category_id
+                        )
+                        ->map(function (
+                            $serviceId
+                        ) {
+                            return (int) $serviceId;
+                        })
+                        ->toArray();
+                }
+
+
+                $row->categories =
+                    $categories;
             }
 
-            return response()->json(['result' => 1, 'msg' => 'Salon data found', 'data' => $result]);
-        } else {
-            return response()->json(['result' => -1, 'msg' => 'No data found']);
+
+            return response()->json([
+                'result' => 1,
+                'msg' =>
+                    'Salon data found',
+                'data' =>
+                    $result
+            ]);
+
+
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'result' => -1,
+                'msg' =>
+                    $e->getMessage()
+            ], 500);
         }
     }
 
@@ -1572,7 +3057,7 @@ class SalonController extends Controller
     {
         $salon_id = $req->post('salon_id');
         update('salon', 'salon_id', $salon_id, ['status' => 'Deleted']);
-        return response()->json(['result' => 1, 'msg' => 'Salon Deleted Successfully', 'data' => null], 200);
+        return response()->json(['result' => 1, 'msg' => 'Salon deleted Successfully.', 'data' => null], 200);
     }
 
     public function sendCustomMail()
@@ -1984,5 +3469,195 @@ class SalonController extends Controller
             // Handle the exception
             return response()->json(['result' => -1, 'msg' => 'An error occurred: ' . $e->getMessage()]);
         }
+    }
+
+
+    private function validateSalonCategorySlots($bookingType,array $bookingSlots,$openingTime,$closingTime) 
+    {
+        if (empty($bookingSlots)) {
+            return 'At least one booking slot is required.';
+        }
+
+
+        /*
+        * Fixed Time
+        */
+        if ($bookingType === 'fixed_time') {
+
+            $usedTimes = [];
+
+
+            foreach ($bookingSlots as $slot) {
+
+                $startTime =
+                    $slot['start_time'] ?? null;
+
+
+                if (empty($startTime)) {
+                    return 'Start time is required.';
+                }
+
+
+                /*
+                * Fixed booking accepts only start_time.
+                */
+                if (
+                    isset($slot['end_time']) &&
+                    !empty($slot['end_time'])
+                ) {
+                    return
+                        'End time is not allowed for fixed-time booking.';
+                }
+
+
+                /*
+                * Must remain inside salon timings.
+                */
+                if (
+                    $startTime < $openingTime ||
+                    $startTime >= $closingTime
+                ) {
+                    return
+                        "Booking time {$startTime} must be within salon opening and closing time.";
+                }
+
+
+                /*
+                * Duplicate time.
+                */
+                if (
+                    in_array(
+                        $startTime,
+                        $usedTimes,
+                        true
+                    )
+                ) {
+                    return
+                        "Duplicate booking time {$startTime}.";
+                }
+
+
+                $usedTimes[] =
+                    $startTime;
+            }
+
+
+            return null;
+        }
+
+
+        /*
+        * Time Window
+        */
+        if ($bookingType === 'time_window') {
+
+            $windows = [];
+
+
+            foreach ($bookingSlots as $slot) {
+
+                $startTime =
+                    $slot['start_time'] ?? null;
+
+                $endTime =
+                    $slot['end_time'] ?? null;
+
+
+                if (
+                    empty($startTime) ||
+                    empty($endTime)
+                ) {
+                    return
+                        'Start time and end time are required for time-window booking.';
+                }
+
+
+                /*
+                * Window must have positive duration.
+                */
+                if ($endTime <= $startTime) {
+                    return
+                        "End time must be greater than start time for {$startTime}.";
+                }
+
+
+                /*
+                * Entire window must fall inside
+                * salon opening and closing time.
+                */
+                if (
+                    $startTime < $openingTime ||
+                    $endTime > $closingTime
+                ) {
+                    return
+                        "Booking window {$startTime}-{$endTime} must be within salon opening and closing time.";
+                }
+
+
+                $windows[] = [
+                    'start_time' =>
+                        $startTime,
+
+                    'end_time' =>
+                        $endTime
+                ];
+            }
+
+
+            /*
+            * Sort by start time before overlap check.
+            */
+            usort(
+                $windows,
+                function ($a, $b) {
+                    return strcmp(
+                        $a['start_time'],
+                        $b['start_time']
+                    );
+                }
+            );
+
+
+            /*
+            * Check overlapping windows.
+            *
+            * Allowed:
+            *
+            * 10:00 - 14:00
+            * 14:00 - 18:00
+            *
+            * Invalid:
+            *
+            * 10:00 - 14:00
+            * 13:00 - 17:00
+            */
+            for (
+                $i = 1;
+                $i < count($windows);
+                $i++
+            ) {
+
+                $previous =
+                    $windows[$i - 1];
+
+                $current =
+                    $windows[$i];
+
+
+                if (
+                    $current['start_time'] <
+                    $previous['end_time']
+                ) {
+                    return
+                        "Booking windows {$previous['start_time']}-{$previous['end_time']} and {$current['start_time']}-{$current['end_time']} overlap.";
+                }
+            }
+
+
+            return null;
+        }
+
+
+        return 'Invalid category booking type.';
     }
 }

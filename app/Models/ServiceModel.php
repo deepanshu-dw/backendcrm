@@ -15,10 +15,7 @@ class serviceModel extends Model
         return DB::table('services')->insertGetId($insert);
     }
 
-    public static function serviceNameExists(
-        $serviceName,
-        $excludeServiceId = null
-    ): bool {
+    public static function serviceNameExists($serviceName,$excludeServiceId = null): bool {
         $query = DB::table('services')
             ->where('status', 'Active')
             ->whereRaw(
@@ -531,4 +528,16 @@ class serviceModel extends Model
 			->limit(3);
 		return $query->get();
 	}
+
+    public static function getActiveServicesByCategoryAndIds($categoryId,array $serviceIds) {
+        if (empty($serviceIds)) {
+            return collect();
+        }
+
+        return DB::table('services')
+            ->where('category_id', $categoryId)
+            ->where('status', 'Active')
+            ->whereIn('service_id', $serviceIds)
+            ->get();
+    }
 }
