@@ -124,8 +124,9 @@ class CategoryController extends Controller
     public function getAllCategory(Request $request)
     {
         $keyword = $request->query("keyword");
+        $type = $request->query("type", "all");
 
-        $categories = CategoryModel::getAllCategories("Active", $keyword);
+        $categories = CategoryModel::getAllCategories("Active", $keyword, $type);
 
         if ($categories->isEmpty()) {
             return response()->json([

@@ -27,20 +27,19 @@ class CategoryModel extends Model
         return $query->exists();
     }
 
-    public static function getAllCategories($status = "Active",$keyword = null) {
-        $query = DB::table("categories")
-            ->orderBy("created_at", "desc");
+    public static function getAllCategories($status = "Active",$keyword = null,$type = "all") {
+        $query = DB::table("categories")->orderBy("created_at", "desc");
 
         if (!empty($status)) {
             $query->where("status", $status);
         }
 
         if (!empty($keyword)) {
-            $query->where(
-                "name",
-                "LIKE",
-                "%" . trim($keyword) . "%"
-            );
+            $query->where("name","LIKE","%" . trim($keyword) . "%");
+        }
+
+        if (!empty($type) && $type !== "all") {
+            $query->where("booking_type", $type);
         }
 
         return $query->get();

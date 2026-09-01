@@ -98,12 +98,12 @@ class SalonModel extends Model
 				$manager = DB::table('admins')->where('status', 'Active')->where('admin_id', $user_id)->first();
 				if ($manager && !empty($manager->salons)) {
 					$salon_ids = json_decode($manager->salons);
-					$result = DB::table('salon')->whereIn('salon_id', $salon_ids)->where('status', 'Active');
+					$result = DB::table('salon')->whereIn('salon_id', $salon_ids)->where('status', 'Active')->orderBy("created_at", "desc");
 				} else {
-					$result = DB::table('salon')->where('status', 'Active');
+					$result = DB::table('salon')->where('status', 'Active')->orderBy("created_at", "desc");
 				}
 			} else {
-				$result = DB::table('salon')->where('status', 'Active');
+				$result = DB::table('salon')->where('status', 'Active')->orderBy("created_at", "desc");
 			}
 
             if ($paginate == 'true') {
