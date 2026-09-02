@@ -26,7 +26,7 @@ class SalonModel extends Model
 
     public static function salonEmailExists($email, $excludeSalonId = null): bool
     {
-        logger()->info('Checking if salon email exists: ' . $email . ', excluding salon ID: ' . $excludeSalonId);
+        // logger()->info('Checking if salon email exists: ' . $email . ', excluding salon ID: ' . $excludeSalonId);
         $query = DB::table('salon')
             ->where('status', 'Active')
             ->whereRaw(
@@ -82,10 +82,8 @@ class SalonModel extends Model
             ->update($update);
     }
 
-    public static function getSalonDetails(
-    $salonId,
-    $lang = null
-    ) {
+    public static function getSalonDetails($salonId,$lang = null) 
+    {
         return DB::table('salon')
             ->where('salon_id', $salonId)
             ->first();
