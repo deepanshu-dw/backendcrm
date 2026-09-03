@@ -93,6 +93,7 @@ Route::group(['prefix' => 'salons'], function () {
     Route::post('/sendOtp', [SalonController::class, 'resendOtp']);
     Route::post('/verifyOtp', [SalonController::class, 'verifyOtp']);
     Route::post('/booking', [SalonController::class, 'booking']);
+    Route::post('/bookingV2', [SalonController::class, 'bookingV2']);
     Route::get('/booking/{lang?}/{booking_id?}', [SalonController::class, 'getBookingDetails']);
     Route::get('/allbooking/{lang?}/{status?}/{salon_id?}/{visit_type?}/{booking_date?}', [SalonController::class, 'getBookings']);
 	Route::get('/allbookingV2/{lang?}/{status?}/{salon_id?}/{visit_type?}/{booking_date?}', [SalonController::class, 'getBookingsV2']);
