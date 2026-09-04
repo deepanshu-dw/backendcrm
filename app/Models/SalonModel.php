@@ -470,6 +470,7 @@ class SalonModel extends Model
 				'customers.email',
 				'customers.phone',
 				'salon.salon_name_en',
+				'salon.salon_id',
 				'salon.salon_thumbnail',
 				'salon_worker.worker_name',
 				'slots.slot_time'
