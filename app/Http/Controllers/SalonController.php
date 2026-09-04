@@ -4387,7 +4387,7 @@ class SalonController extends Controller
 
     //     return response()->json(['result' => 1, 'msg' => 'Status Updated Successfully', 'data' => null], 200);
     // }
-        public function updateBookingStatus(Request $request)
+    public function updateBookingStatus(Request $request)
     {
         try {
 
@@ -4441,11 +4441,14 @@ class SalonController extends Controller
             |--------------------------------------------------------------------------
             |
             | Existing/legacy bookings:
-            | - Continue using worker_id / slots as before.
+            | - Continue using the existing booking flow.
             |
             | V2 bookings:
-            | - worker_id is assigned when accepted.
-            | - booking_time is assigned when accepted.
+            | - worker_id is optional when accepting.
+            | - If worker_id is provided, it will be updated.
+            | - If worker_id is not provided, only booking_status is updated.
+            | - booking_time is NOT handled here because it is already
+            |   provided during booking creation.
             |
             */
 
@@ -4472,75 +4475,21 @@ class SalonController extends Controller
 
                 if (!empty($booking->category_id)) {
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Hair stylist / worker is optional
+                    |--------------------------------------------------------------------------
+                    |
+                    | If worker_id is provided, assign the stylist.
+                    | If not provided, only the status will be updated.
+                    |
+                    */
+
                     $worker_id = $request->post('worker_id');
-                    $booking_time = $request->post('booking_time');
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Worker is required for accepting V2 booking
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if (empty($worker_id)) {
-                        return response()->json([
-                            'result' => 0,
-                            'msg' => 'Worker is required when accepting this booking.'
-                        ]);
+                    if (!empty($worker_id)) {
+                        $updateData['worker_id'] = $worker_id;
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Time is required for accepting V2 booking
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if (empty($booking_time)) {
-                        return response()->json([
-                            'result' => 0,
-                            'msg' => 'Booking time is required when accepting this booking.'
-                        ]);
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Convert AM/PM time to MySQL TIME format
-                    |--------------------------------------------------------------------------
-                    |
-                    | Example:
-                    |
-                    | 02:30 PM -> 14:30:00
-                    | 10:15 AM -> 10:15:00
-                    |
-                    */
-
-                    $parsedTime = null;
-
-                    try {
-
-                        $parsedTime = Carbon::createFromFormat(
-                            'h:i A',
-                            strtoupper(trim($booking_time))
-                        );
-
-                    } catch (\Exception $e) {
-
-                        return response()->json([
-                            'result' => 0,
-                            'msg' => 'Invalid booking time. Please use format like 02:30 PM.'
-                        ]);
-                    }
-
-                    if (empty($parsedTime)) {
-                        return response()->json([
-                            'result' => 0,
-                            'msg' => 'Invalid booking time. Please use format like 02:30 PM.'
-                        ]);
-                    }
-
-                    $updateData['worker_id'] = $worker_id;
-
-                    $updateData['booking_time'] =
-                        $parsedTime->format('H:i:s');
                 }
 
                 /*
@@ -4548,9 +4497,7 @@ class SalonController extends Controller
                 | Legacy booking
                 |--------------------------------------------------------------------------
                 |
-                | We don't change anything here.
-                |
-                | Existing worker_id / slots logic continues as it was.
+                | No changes to the existing legacy flow.
                 |
                 */
             }
@@ -4691,29 +4638,10 @@ class SalonController extends Controller
                     | V2 Booking Time
                     |--------------------------------------------------------------------------
                     |
-                    | Database:
-                    | 14:30:00
-                    |
-                    | API response:
-                    | 02:30 PM
+                    | V2 booking time is already stored during booking creation.
+                    | We do not modify or convert it here.
                     |
                     */
-
-                    if (
-                        !empty($booking->booking_time) &&
-                        !empty($booking->category_id)
-                    ) {
-
-                        $booking->booking_time_display =
-                            Carbon::createFromFormat(
-                                'H:i:s',
-                                $booking->booking_time
-                            )->format('h:i A');
-
-                    } else {
-
-                        $booking->booking_time_display = null;
-                    }
                 }
 
                 /*
