@@ -1518,9 +1518,7 @@ class SalonController extends Controller
         }
     }
 
-    public function getAllSalons(
-        Request $request
-    ) {
+    public function getAllSalons(Request $request) {
         try {
 
             $user =

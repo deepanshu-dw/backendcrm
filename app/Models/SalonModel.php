@@ -272,12 +272,25 @@ class SalonModel extends Model
             }
 
             $query = DB::table('services')
-                // ->select('*')
-                ->select('service_id', "service_name_$lang as service_name", "service_description_$lang as description", "price_$lang as price", 'service_time_taken', 'is_hair_extension', 'hair_gm', 'hair_per_unit', 'hair_gm_pln', 'hair_gm_dl', 'hair_gm_eu', 'is_archived','service_thumbnail')
+                ->select(
+                    'service_id',
+                    'service_name_en as service_name',
+                    "service_description_en as description",
+                    "price_$lang as price",
+                    "customer_name_$lang as customer_facing_name",
+                    'service_time_taken',
+                    'is_hair_extension',
+                    'hair_gm',
+                    'hair_per_unit',
+                    'hair_gm_pln',
+                    'hair_gm_dl',
+                    'hair_gm_eu',
+                    'is_archived',
+                    'service_thumbnail'
+                )
                 ->whereIn('service_id', $service_id);
-            // ->where('status', '!=', 'deleted');
             if ($is_admin == "false") {
-				$query->where('is_archived', '=', 'No');
+                $query->where('is_archived', '=', 'No');
             }
             $result = $query->get();
 
