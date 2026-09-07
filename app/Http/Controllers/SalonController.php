@@ -2918,14 +2918,14 @@ class SalonController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'salon_id'      => 'required',
-                'category_id'   => 'required',
-                'services'      => 'required',
-                'booking_date'  => 'required|date',
-                'booking_time'  => [
-                    'required',
-                    'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'
-                ],
-                'customer_name' => 'required',
+                // 'category_id'   => 'required',
+                // 'services'      => 'required',
+                // 'booking_date'  => 'required|date',
+                // 'booking_time'  => [
+                //     'required',
+                //     'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'
+                // ],
+                // 'customer_name' => 'required',
             ], [
                 'required' => 'This :attribute is Required',
                 'array' => 'The :attribute must be an array',
