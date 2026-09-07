@@ -133,24 +133,17 @@ class ServiceController extends Controller
 		$service_thumbnail = null;
 
 		if (!empty($request->hasfile('service_thumbnail'))) {
-			$service_thumbnail = singleAwsUpload(
-				$request,
-				'service_thumbnail'
-			);
+			$service_thumbnail = singleAwsUpload($request,'service_thumbnail');
 		}
 
 		$insert = [
 			'category_id' => $categoryId,
 			'service_name_en' => $serviceName,
-			'service_description_en' =>
-				$request->input('service_description_en'),
+			'service_description_en' => $request->input('service_description_en'),
 
-			'customer_name_en' =>
-				trim($request->input('customer_name_en')),
-			'customer_name_es' =>
-				trim($request->input('customer_name_es')),
-			'customer_name_pl' =>
-				trim($request->input('customer_name_pl')),
+			'customer_name_en' => trim($request->input('customer_name_en')),
+			'customer_name_es' => trim($request->input('customer_name_es')),
+			'customer_name_pl' => trim($request->input('customer_name_pl')),
 
 			'price_type' => $request->input('price_type'),
 			'price_note' => $request->input('price_note'),
@@ -159,13 +152,10 @@ class ServiceController extends Controller
 			'price_es' => (float) $request->input('price_es'),
 			'price_pl' => (float) $request->input('price_pl'),
 
-			'service_time_taken' =>
-				(int) $request->input('service_time_taken'),
+			'service_time_taken' => (int) $request->input('service_time_taken'),
 
-			'is_archived' =>
-				$request->input('is_archived', 'No'),
-			'service_thumbnail' =>
-				$request->input('service_thumbnail'),
+			'is_archived' => $request->input('is_archived', 'No'),
+			'service_thumbnail' => $service_thumbnail,
 			'status' => 'Active',
 			'created_at' => now(),
 			'updated_at' => now(),
@@ -373,16 +363,9 @@ class ServiceController extends Controller
 		$serviceName = null;
 
 		if ($request->has('service_name_en')) {
-			$serviceName = trim(
-				$request->input('service_name_en')
-			);
+			$serviceName = trim($request->input('service_name_en'));
 
-			if (
-				ServiceModel::serviceNameExists(
-					$serviceName,
-					$serviceId
-				)
-			) {
+			if (ServiceModel::serviceNameExists($serviceName,$serviceId)) {
 				return response()->json([
 					'result' => 0,
 					'msg' => "This Service already exists. Please enter a unique service name.",
@@ -390,37 +373,25 @@ class ServiceController extends Controller
 			}
 		}
 
-		/*
-		* Validate category only when category_id
-		* is included in the update request.
-		*/
+
 		if ($request->has('category_id')) {
 			$categoryId = (int) $request->input('category_id');
 
-			$category = CategoryModel::getCategoryById(
-				$categoryId
-			);
+			$category = CategoryModel::getCategoryById($categoryId);
 
 			if (!$category) {
-				return response()->json([
-					'result' => 0,
-					'msg' => 'Please provide a valid category.',
-				]);
+				return response()->json(['result' => 0,'msg' => 'Please provide a valid category.']);
 			}
 
 			if ($category->status !== 'Active') {
-				return response()->json([
-					'result' => 0,
-					'msg' => 'Please provide an active category.',
-				]);
+				return response()->json(['result' => 0,'msg' => 'Please provide an active category.']);
 			}
 		}
 
 		$update = [];
 
 		if ($request->has('category_id')) {
-			$update['category_id'] =
-				(int) $request->input('category_id');
+			$update['category_id'] = (int) $request->input('category_id');
 		}
 
 		if ($request->has('service_name_en')) {
@@ -428,73 +399,58 @@ class ServiceController extends Controller
 		}
 
 		if ($request->has('service_description_en')) {
-			$update['service_description_en'] =
-				$request->input('service_description_en');
+			$update['service_description_en'] = $request->input('service_description_en');
 		}
 
 		if ($request->has('customer_name_en')) {
-			$update['customer_name_en'] = trim(
-				$request->input('customer_name_en')
-			);
+			$update['customer_name_en'] = trim($request->input('customer_name_en'));
 		}
 
 		if ($request->has('customer_name_es')) {
-			$update['customer_name_es'] = trim(
-				$request->input('customer_name_es')
-			);
+			$update['customer_name_es'] = trim($request->input('customer_name_es'));
 		}
 
 		if ($request->has('customer_name_pl')) {
-			$update['customer_name_pl'] = trim(
-				$request->input('customer_name_pl')
-			);
+			$update['customer_name_pl'] = trim($request->input('customer_name_pl'));
 		}
 
 		if ($request->has('price_type')) {
-			$update['price_type'] =
-				$request->input('price_type');
+			$update['price_type'] = $request->input('price_type');
 		}
 
-		/*
-		* exists() is used because price_note
-		* may intentionally be set to null.
-		*/
 		if ($request->exists('price_note')) {
-			$update['price_note'] =
-				$request->input('price_note');
+			$update['price_note'] = $request->input('price_note');
 		}
 
 		if ($request->has('price_en')) {
-			$update['price_en'] =
-				(float) $request->input('price_en');
+			$update['price_en'] = (float) $request->input('price_en');
 		}
 
 		if ($request->has('price_es')) {
-			$update['price_es'] =
-				(float) $request->input('price_es');
+			$update['price_es'] = (float) $request->input('price_es');
 		}
 
 		if ($request->has('price_pl')) {
-			$update['price_pl'] =
-				(float) $request->input('price_pl');
+			$update['price_pl'] = (float) $request->input('price_pl');
 		}
 
 		if ($request->has('service_time_taken')) {
-			$update['service_time_taken'] =
-				(int) $request->input('service_time_taken');
+			$update['service_time_taken'] = (int) $request->input('service_time_taken');
 		}
 
 		if ($request->has('is_archived')) {
-			$update['is_archived'] =
-				$request->input('is_archived');
+			$update['is_archived'] = $request->input('is_archived');
+		}
+
+		$service_thumbnail = null;
+
+		if (!empty($request->hasfile('service_thumbnail'))) {
+			$update['service_thumbnail'] = singleAwsUpload($request,'service_thumbnail');
 		}
 
 		$update['updated_at'] = now();
 
-		$result = ServiceModel::updateService(
-			$update,
-			$serviceId
-		);
+		$result = ServiceModel::updateService($update,$serviceId);
 
 		if ($result === 0) {
 			return response()->json([
