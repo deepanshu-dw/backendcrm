@@ -679,7 +679,7 @@ class ServiceController extends Controller
 	public function getSalonStats(Request $request, $salon_id, ServiceModel $serviceModel)
     {
         try {
-			$salon = DB::table('salon')->where('salon_id', $salon_id)->select('salon_name_en', 'salon_address_en')->first();
+			$salon = DB::table('salon')->where('salon_id', $salon_id)->select('salon_name_en', 'salon_address_en','salon_thumbnail')->first();
 
 			$result = [
 				'salon_name_en' => $salon->salon_name_en ?? '',
