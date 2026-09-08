@@ -2941,6 +2941,7 @@ class SalonController extends Controller
                 $recaptcha_secret = "6LceZAYqAAAAAHqfRTPx6Olfda8r0Ulh1JyB3L3D";
 
                 if (!empty($recaptcha_response)) {
+
                     $response = file_get_contents(
                         "https://www.google.com/recaptcha/api/siteverify?secret=$recaptcha_secret&response=$recaptcha_response"
                     );
@@ -2959,18 +2960,68 @@ class SalonController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 3. REQUEST DATA
+            | NOTIFICATION TRANSLATIONS
+            |--------------------------------------------------------------------------
+            */
+
+            $notificationTranslations = [
+
+                'appointment_booked' => [
+                    'en' => [
+                        'subject' => 'Appointment Booked',
+                        'message' => 'New booking has been successful',
+                    ],
+                    'es' => [
+                        'subject' => 'Cita reservada',
+                        'message' => 'La nueva reserva se ha realizado correctamente',
+                    ],
+                    'pl' => [
+                        'subject' => 'Wizyta zarezerwowana',
+                        'message' => 'Nowa rezerwacja została pomyślnie dokonana',
+                    ],
+                ],
+
+                'appointment_updated' => [
+                    'en' => [
+                        'subject' => 'Appointment Updated',
+                        'message' => 'Booking has been updated.',
+                    ],
+                    'es' => [
+                        'subject' => 'Cita actualizada',
+                        'message' => 'La reserva ha sido actualizada.',
+                    ],
+                    'pl' => [
+                        'subject' => 'Wizyta zaktualizowana',
+                        'message' => 'Rezerwacja została zaktualizowana.',
+                    ],
+                ],
+            ];
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | REQUEST DATA
             |--------------------------------------------------------------------------
             */
 
             $salon_id = $request->post('salon_id');
 
             /*
-            * Optional fields.
+            * IMPORTANT:
+            * This is the same create/update mechanism as old booking API.
             */
+            $booking_id = $request->post('booking_id');
+
             $category_id = $request->post('category_id');
             $visit_type = $request->post('visit_type');
             $worker_id = $request->post('worker_id');
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SERVICES
+            |--------------------------------------------------------------------------
+            */
 
             $services_array = null;
 
@@ -2978,12 +3029,12 @@ class SalonController extends Controller
 
                 $services_input = $request->post('services');
 
-                /*
-                * Services may come as JSON string or array.
-                */
                 if (is_array($services_input)) {
+
                     $services_array = $services_input;
+
                 } else {
+
                     $services_array = json_decode(
                         $services_input,
                         true
@@ -2997,12 +3048,17 @@ class SalonController extends Controller
 
 
             /*
-            * Booking date is optional.
-            * Only process it when supplied.
+            |--------------------------------------------------------------------------
+            | BOOKING DATE
+            |--------------------------------------------------------------------------
             */
+
             $booking_date = null;
 
-            if ($request->has('booking_date') && !empty($request->post('booking_date'))) {
+            if (
+                $request->has('booking_date') &&
+                !empty($request->post('booking_date'))
+            ) {
 
                 $booking_date = date(
                     'Y-m-d',
@@ -3012,12 +3068,17 @@ class SalonController extends Controller
 
 
             /*
-            * Booking time is optional.
-            * Only validate/process it when supplied.
+            |--------------------------------------------------------------------------
+            | BOOKING TIME
+            |--------------------------------------------------------------------------
             */
+
             $booking_time = null;
 
-            if ($request->has('booking_time') && !empty($request->post('booking_time'))) {
+            if (
+                $request->has('booking_time') &&
+                !empty($request->post('booking_time'))
+            ) {
 
                 $booking_time = $request->post('booking_time');
 
@@ -3025,6 +3086,7 @@ class SalonController extends Controller
                     '/^(?:[01]\d|2[0-3]):[0-5]\d$/',
                     $booking_time
                 )) {
+
                     return response()->json([
                         'result' => 0,
                         'msg' => 'The booking time must be in 24-hour format (HH:mm).'
@@ -3035,7 +3097,7 @@ class SalonController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 4. VALIDATE SALON
+            | VALIDATE SALON
             |--------------------------------------------------------------------------
             */
 
@@ -3049,6 +3111,7 @@ class SalonController extends Controller
             )->first();
 
             if (empty($salon)) {
+
                 return response()->json([
                     'result' => -2,
                     'msg' => 'Salon not found.'
@@ -3058,10 +3121,7 @@ class SalonController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 5. VALIDATE CATEGORY
-            |--------------------------------------------------------------------------
-            |
-            | Only execute this when category_id exists.
+            | VALIDATE CATEGORY
             |--------------------------------------------------------------------------
             */
 
@@ -3079,6 +3139,7 @@ class SalonController extends Controller
                 )->first();
 
                 if (empty($category)) {
+
                     return response()->json([
                         'result' => -2,
                         'msg' => 'Category not found or inactive.'
@@ -3089,11 +3150,7 @@ class SalonController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 6. VALIDATE SERVICES
-            |--------------------------------------------------------------------------
-            |
-            | Only execute service validation when services
-            | actually exist in the payload.
+            | VALIDATE SERVICES
             |--------------------------------------------------------------------------
             */
 
@@ -3110,11 +3167,8 @@ class SalonController extends Controller
                     )
                 );
 
-                /*
-                * If services key exists, it must contain at least
-                * one valid service.
-                */
                 if (empty($services_array)) {
+
                     return response()->json([
                         'result' => -2,
                         'msg' => 'Please select at least one service.'
@@ -3125,6 +3179,7 @@ class SalonController extends Controller
                 /*
                 * Get service records.
                 */
+
                 $serviceRecords = DB::table('services')
                     ->select(
                         'service_id',
@@ -3138,11 +3193,14 @@ class SalonController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 7. CHECK ALL SERVICES EXIST
+                | CHECK ALL SERVICES EXIST
                 |--------------------------------------------------------------------------
                 */
 
-                if ($serviceRecords->count() !== count($services_array)) {
+                if (
+                    $serviceRecords->count() !==
+                    count($services_array)
+                ) {
 
                     return response()->json([
                         'result' => -2,
@@ -3153,11 +3211,7 @@ class SalonController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 8. CHECK SERVICES CATEGORY
-                |--------------------------------------------------------------------------
-                |
-                | Only perform this check when category_id
-                | is also supplied.
+                | CHECK SERVICES CATEGORY
                 |--------------------------------------------------------------------------
                 */
 
@@ -3181,7 +3235,7 @@ class SalonController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 9. CHECK SERVICES ACTIVE
+                | CHECK SERVICES ACTIVE
                 |--------------------------------------------------------------------------
                 */
 
@@ -3202,7 +3256,7 @@ class SalonController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 10. STORE SERVICES
+                | STORE SERVICES
                 |--------------------------------------------------------------------------
                 */
 
@@ -3212,11 +3266,7 @@ class SalonController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 11. CUSTOMER
-            |--------------------------------------------------------------------------
-            |
-            | Customer processing is performed only when the customer
-            | related information is available.
+            | CUSTOMER
             |--------------------------------------------------------------------------
             */
 
@@ -3243,6 +3293,7 @@ class SalonController extends Controller
             if (!empty($customerexist)) {
 
                 $customer = [
+
                     'customer_name' => $request->has('customer_name')
                         ? $request->post('customer_name')
                         : $customerexist->customer_name,
@@ -3270,9 +3321,11 @@ class SalonController extends Controller
                     'updated_at' => now()
                 ];
 
+
                 if (!empty($shopify_user_id)) {
                     $customer['shopify_user_id'] = $shopify_user_id;
                 }
+
 
                 update(
                     'customers',
@@ -3285,10 +3338,6 @@ class SalonController extends Controller
 
             } else {
 
-                /*
-                * Only create a customer when customer information
-                * has actually been supplied.
-                */
                 if (
                     !empty($email) ||
                     $request->has('customer_name') ||
@@ -3301,6 +3350,7 @@ class SalonController extends Controller
                 ) {
 
                     $customer = [
+
                         'customer_name' => $request->post('customer_name'),
 
                         'gender' => $request->post('gender'),
@@ -3320,9 +3370,11 @@ class SalonController extends Controller
                         'updated_at' => now()
                     ];
 
+
                     if (!empty($shopify_user_id)) {
                         $customer['shopify_user_id'] = $shopify_user_id;
                     }
+
 
                     $customer_id = insert(
                         'customers',
@@ -3334,12 +3386,13 @@ class SalonController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 12. FILES
+            | FILES
             |--------------------------------------------------------------------------
             */
 
             $signature_image = null;
             $contract_file = null;
+
 
             if ($request->hasFile('signature')) {
 
@@ -3348,6 +3401,7 @@ class SalonController extends Controller
                     'signature'
                 );
             }
+
 
             if ($request->hasFile('contract_file')) {
 
@@ -3360,7 +3414,7 @@ class SalonController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 13. PAYMENT
+            | PAYMENT
             |--------------------------------------------------------------------------
             */
 
@@ -3371,667 +3425,1077 @@ class SalonController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 14. CREATE V2 BOOKING
+            | CREATE / UPDATE BOOKING
             |--------------------------------------------------------------------------
             |
-            | Optional fields are inserted as NULL when they are not supplied.
+            | IMPORTANT:
             |
-            | worker_id is now accepted from payload.
+            | Same behavior as OLD booking() API:
+            |
+            | booking_id exists -> UPDATE
+            |
+            | booking_id empty -> CREATE
+            |
             |--------------------------------------------------------------------------
             */
 
-            $insertdata = [
+            if (!empty($booking_id)) {
 
-                'customer_id' => $customer_id,
-
-                'booking_for' => $request->post('customer_name'),
-
-                'contact_no' => $request->post('phone'),
 
                 /*
-                * Worker is optional.
+                |--------------------------------------------------------------------------
+                | UPDATE EXISTING BOOKING
+                |--------------------------------------------------------------------------
                 */
-                'worker_id' => !empty($worker_id)
-                    ? $worker_id
-                    : null,
 
-                'salon_id' => $salon_id,
-
-                /*
-                * Category is optional.
-                */
-                'category_id' => !empty($category_id)
-                    ? $category_id
-                    : null,
-
-                'currency_id' => $request->post('currency_id'),
-
-                'currency_code' => $request->post('currency_code'),
-
-                'is_confirmed' => 'no',
-
-                'isArchived' => 'no',
-
-                'agreement_id' => null,
-
-                'booking_status' => 'Pending',
-
-                'contract_signed' => $request->post('contract_signed'),
-
-                'total_pay_amt' => null,
-
-                'payment_type' => $payment,
-
-                'pre_payment_made' => $request->post('pre_payment_made'),
-
-                'pre_payment_amt' => null,
-
-                /*
-                * Booking date is optional.
-                */
-                'booking_date' => $booking_date,
-
-                /*
-                * Booking time is optional.
-                */
-                'booking_time' => $booking_time,
-
-                /*
-                * V2 does not use legacy slots.
-                */
-                'slots' => null,
-
-                /*
-                * Services are optional.
-                */
-                'services' => $services,
-
-                'visit_type' => $visit_type,
-
-                'preferred_lang' => $request->post('preferred_lang'),
-
-                'secondary_lang' => $request->post('secondary_lang'),
-
-                'status' => 'Active',
-            ];
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | 15. INSERT BOOKING
-            |--------------------------------------------------------------------------
-            */
-
-            $result = insert(
-                'booking',
-                $insertdata
-            );
-
-            if (!$result) {
-
-                return response()->json([
-                    'result' => -1,
-                    'msg' => 'Something Went Wrong'
-                ]);
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | 16. AGREEMENT
-            |--------------------------------------------------------------------------
-            */
-
-            $agreement = [
-                'customer_id' => $customer_id,
-                'booking_id' => $result,
-                'is_signed' => 'yes',
-                'date_of_sign' => now(),
-                'status' => 'Active',
-            ];
-
-            $agreementresult = insert(
-                'agreement',
-                $agreement
-            );
-
-            if ($agreementresult) {
-
-                insert(
-                    'agreement_documents',
+                $oldbookingdata = select(
+                    'booking',
+                    '*',
                     [
-                        'agreement_id' => $agreementresult,
-                        'document_file' => null,
-                        'document_type' => 'agreement'
+                        ['booking_id', '=', $booking_id],
+                        ['status', '=', 'Active']
                     ]
-                );
+                )->first();
+
+
+                if (empty($oldbookingdata)) {
+
+                    return response()->json([
+                        'result' => -2,
+                        'msg' => 'Booking not found or inactive.'
+                    ]);
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | EXISTING AGREEMENT
+                |--------------------------------------------------------------------------
+                */
+
+                $oldagreement = select(
+                    'agreement',
+                    '*',
+                    [
+                        ['booking_id', '=', $booking_id],
+                        ['agreement_id', '=', @$oldbookingdata->agreement_id],
+                        ['status', '=', 'Active']
+                    ]
+                )->first();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | EXISTING AGREEMENT DOCUMENT
+                |--------------------------------------------------------------------------
+                */
+
+                $oldagreementdocument = select(
+                    'agreement_documents',
+                    '*',
+                    [
+                        ['booking_id', '=', $booking_id],
+                        ['document_type', '=', 'agreement'],
+                        ['status', '=', 'Active']
+                    ]
+                )->first();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | EXISTING SIGNATURE
+                |--------------------------------------------------------------------------
+                */
+
+                $oldagreementsignature = select(
+                    'agreement_documents',
+                    '*',
+                    [
+                        ['booking_id', '=', $booking_id],
+                        ['document_type', '=', 'signature'],
+                        ['status', '=', 'Active']
+                    ]
+                )->first();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | UPDATE DATA
+                |--------------------------------------------------------------------------
+                */
+
+                $updatedata = [
+
+                    'customer_id' => !empty($customer_id)
+                        ? $customer_id
+                        : $oldbookingdata->customer_id,
+
+                    'booking_for' => $request->post('customer_name'),
+
+                    'contact_no' => $request->has('phone')
+                        ? $request->post('phone')
+                        : $oldbookingdata->contact_no,
+
+                    'worker_id' => $request->has('worker_id')
+                        ? (
+                            !empty($worker_id)
+                                ? $worker_id
+                                : null
+                        )
+                        : $oldbookingdata->worker_id,
+
+                    'salon_id' => $salon_id,
+
+                    'category_id' => $request->has('category_id')
+                        ? (
+                            !empty($category_id)
+                                ? $category_id
+                                : null
+                        )
+                        : $oldbookingdata->category_id,
+
+                    'currency_id' => $request->has('currency_id')
+                        ? $request->post('currency_id')
+                        : $oldbookingdata->currency_id,
+
+                    'currency_code' => $request->has('currency_code')
+                        ? $request->post('currency_code')
+                        : $oldbookingdata->currency_code,
+
+                    'is_confirmed' => 'no',
+
+                    'isArchived' => 'no',
+
+                    'agreement_id' => @$oldagreement->agreement_id,
+
+                    'booking_status' => 'inprogress',
+
+                    'contract_signed' => $request->has('contract_signed')
+                        ? $request->post('contract_signed')
+                        : $oldbookingdata->contract_signed,
+
+                    'total_pay_amt' => $request->has('total_pay_amt')
+                        ? $request->post('total_pay_amt')
+                        : $oldbookingdata->total_pay_amt,
+
+                    'payment_type' => $request->has('payment_type')
+                        ? $payment
+                        : $oldbookingdata->payment_type,
+
+                    'pre_payment_made' => $request->has('pre_payment_made')
+                        ? $request->post('pre_payment_made')
+                        : $oldbookingdata->pre_payment_made,
+
+                    'pre_payment_amt' => $request->has('pre_payment_amt')
+                        ? $request->post('pre_payment_amt')
+                        : $oldbookingdata->pre_payment_amt,
+
+                    'booking_date' => $request->has('booking_date')
+                        ? $booking_date
+                        : $oldbookingdata->booking_date,
+
+                    'booking_time' => $request->has('booking_time')
+                        ? $booking_time
+                        : $oldbookingdata->booking_time,
+
+                    /*
+                    * V2 does not use legacy slots.
+                    */
+                    'slots' => null,
+
+                    'services' => $request->has('services')
+                        ? $services
+                        : $oldbookingdata->services,
+
+                    'visit_type' => $request->has('visit_type')
+                        ? $visit_type
+                        : $oldbookingdata->visit_type,
+
+                    'preferred_lang' => $request->has('preferred_lang')
+                        ? $request->post('preferred_lang')
+                        : $oldbookingdata->preferred_lang,
+
+                    'secondary_lang' => $request->has('secondary_lang')
+                        ? $request->post('secondary_lang')
+                        : $oldbookingdata->secondary_lang,
+
+                    'status' => 'Active',
+                ];
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | UPDATE BOOKING
+                |--------------------------------------------------------------------------
+                */
 
                 update(
                     'booking',
                     'booking_id',
-                    $result,
-                    [
-                        'agreement_id' => $agreementresult
-                    ]
+                    $booking_id,
+                    $updatedata
                 );
-            }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | 17. SIGNATURE
-            |--------------------------------------------------------------------------
-            */
+                $result = $booking_id;
 
-            if (!empty($signature_image)) {
-
-                insert(
-                    'agreement_documents',
-                    [
-                        'booking_id' => $result,
-                        'document_file' => $signature_image,
-                        'document_type' => 'signature',
-                    ]
-                );
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | 18. CONTRACT
-            |--------------------------------------------------------------------------
-            */
-
-            if (!empty($contract_file)) {
-
-                insert(
-                    'agreement_documents',
-                    [
-                        'booking_id' => $result,
-                        'contract_file' => $contract_file,
-                        'document_type' => 'contract',
-                    ]
-                );
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | 19. GET CREATED BOOKING
-            |--------------------------------------------------------------------------
-            */
-
-            $booking_id = $result;
-
-            $bookings = select(
-                'booking',
-                '*',
-                [
-                    ['booking_id', '=', $booking_id]
-                ]
-            )->first();
-
-
-            if (!empty($bookings)) {
 
                 /*
                 |--------------------------------------------------------------------------
-                | Services
-                |--------------------------------------------------------------------------
-                |
-                | Only get service details if services were supplied.
+                | UPDATE AGREEMENT DOCUMENT
                 |--------------------------------------------------------------------------
                 */
 
-                $booking_services = !empty($bookings->services)
-                    ? json_decode($bookings->services, true)
-                    : [];
+                if (!empty($oldagreementdocument)) {
 
-                if (!empty($booking_services)) {
-
-                    $bookings->servicedetails =
-                        SalonModel::getServices(
-                            $booking_services
-                        );
-
-                } else {
-
-                    $bookings->servicedetails = [];
+                    update(
+                        'agreement_documents',
+                        'document_id',
+                        $oldagreementdocument->document_id,
+                        [
+                            'document_file' => null
+                        ]
+                    );
                 }
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | Slots
+                | UPDATE SIGNATURE
                 |--------------------------------------------------------------------------
                 */
 
-                $bookings->slotsdetails = [];
+                if (!empty($signature_image)) {
+
+                    deleteMultiple(
+                        'agreement_documents',
+                        [
+                            'booking_id' => $booking_id,
+                            'document_type' => 'signature'
+                        ]
+                    );
+
+
+                    insert(
+                        'agreement_documents',
+                        [
+                            'booking_id' => $booking_id,
+                            'document_file' => $signature_image,
+                            'document_type' => 'signature',
+                        ]
+                    );
+                }
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | Category
-                |--------------------------------------------------------------------------
-                |
-                | Only attach category details when category was supplied.
+                | UPDATE CONTRACT
                 |--------------------------------------------------------------------------
                 */
 
-                $bookings->category_details = !empty($category)
-                    ? $category
-                    : null;
+                if (!empty($contract_file)) {
+
+                    deleteMultiple(
+                        'agreement_documents',
+                        [
+                            'booking_id' => $booking_id,
+                            'document_type' => 'contract'
+                        ]
+                    );
+
+
+                    insert(
+                        'agreement_documents',
+                        [
+                            'booking_id' => $booking_id,
+                            'contract_file' => $contract_file,
+                            'document_type' => 'contract',
+                        ]
+                    );
+                }
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | Booking time
+                | UPDATE NOTIFICATION
                 |--------------------------------------------------------------------------
                 */
 
-                $bookings->booking_time =
-                    !empty($bookings->booking_time)
-                        ? $bookings->booking_time
+                $salontitle = "Appointment Updated";
+                $salonmsg = "Booking has been updated.";
+
+                $notificationType = 'appointment_updated';
+
+
+            } else {
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE NEW BOOKING
+                |--------------------------------------------------------------------------
+                */
+
+                $insertdata = [
+
+                    'customer_id' => $customer_id,
+
+                    'booking_for' => $request->post('customer_name'),
+
+                    'contact_no' => $request->post('phone'),
+
+                    'worker_id' => !empty($worker_id)
+                        ? $worker_id
+                        : null,
+
+                    'salon_id' => $salon_id,
+
+                    'category_id' => !empty($category_id)
+                        ? $category_id
+                        : null,
+
+                    'currency_id' => $request->post('currency_id'),
+
+                    'currency_code' => $request->post('currency_code'),
+
+                    'is_confirmed' => 'no',
+
+                    'isArchived' => 'no',
+
+                    'agreement_id' => null,
+
+                    'booking_status' => 'Pending',
+
+                    'contract_signed' => $request->post('contract_signed'),
+
+                    'total_pay_amt' => $request->post('total_pay_amt'),
+
+                    'payment_type' => $payment,
+
+                    'pre_payment_made' => $request->post('pre_payment_made'),
+
+                    'pre_payment_amt' => $request->post('pre_payment_amt'),
+
+                    'booking_date' => $booking_date,
+
+                    'booking_time' => $booking_time,
+
+                    /*
+                    * V2 does not use legacy slots.
+                    */
+                    'slots' => null,
+
+                    'services' => $services,
+
+                    'visit_type' => $visit_type,
+
+                    'preferred_lang' => $request->post('preferred_lang'),
+
+                    'secondary_lang' => $request->post('secondary_lang'),
+
+                    'status' => 'Active',
+                ];
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | INSERT BOOKING
+                |--------------------------------------------------------------------------
+                */
+
+                $result = insert(
+                    'booking',
+                    $insertdata
+                );
+
+
+                if (!$result) {
+
+                    return response()->json([
+                        'result' => -1,
+                        'msg' => 'Something Went Wrong'
+                    ]);
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | NEW BOOKING NOTIFICATION
+                |--------------------------------------------------------------------------
+                */
+
+                $salontitle = "New Appointment";
+                $salonmsg = "New booking has been made at your salon.";
+
+                $notificationType = 'appointment_booked';
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | AGREEMENT
+            |--------------------------------------------------------------------------
+            |
+            | Same important behavior as OLD booking API:
+            |
+            | Agreement is created ONLY for a NEW booking.
+            |
+            | It is NOT created again when booking_id exists.
+            |--------------------------------------------------------------------------
+            */
+
+            if ($result) {
+
+
+                if (empty($booking_id)) {
+
+                    $agreement = [
+
+                        'customer_id' => $customer_id,
+
+                        'booking_id' => $result,
+
+                        'is_signed' => 'yes',
+
+                        'date_of_sign' => now(),
+
+                        'status' => 'Active',
+                    ];
+
+
+                    $agreementresult = insert(
+                        'agreement',
+                        $agreement
+                    );
+
+
+                    if ($agreementresult) {
+
+                        insert(
+                            'agreement_documents',
+                            [
+                                'agreement_id' => $agreementresult,
+                                'document_file' => null,
+                                'document_type' => 'agreement'
+                            ]
+                        );
+
+
+                        update(
+                            'booking',
+                            'booking_id',
+                            $result,
+                            [
+                                'agreement_id' => $agreementresult
+                            ]
+                        );
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | NEW SIGNATURE
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (!empty($signature_image)) {
+
+                        insert(
+                            'agreement_documents',
+                            [
+                                'booking_id' => $result,
+                                'document_file' => $signature_image,
+                                'document_type' => 'signature',
+                            ]
+                        );
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | NEW CONTRACT
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (!empty($contract_file)) {
+
+                        insert(
+                            'agreement_documents',
+                            [
+                                'booking_id' => $result,
+                                'contract_file' => $contract_file,
+                                'document_type' => 'contract',
+                            ]
+                        );
+                    }
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | GET COMPLETE BOOKING
+                |--------------------------------------------------------------------------
+                */
+
+                $booking_id = $result;
+
+
+                $bookings = select(
+                    'booking',
+                    '*',
+                    [
+                        ['booking_id', '=', $booking_id]
+                    ]
+                )->first();
+
+
+                if (!empty($bookings)) {
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | SERVICES
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $booking_services = !empty($bookings->services)
+                        ? json_decode(
+                            $bookings->services,
+                            true
+                        )
+                        : [];
+
+
+                    if (!empty($booking_services)) {
+
+                        $bookings->servicedetails =
+                            SalonModel::getServices(
+                                $booking_services
+                            );
+
+                    } else {
+
+                        $bookings->servicedetails = [];
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | SLOTS
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $bookings->slotsdetails = [];
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CATEGORY
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $bookings->category_details = !empty($category)
+                        ? $category
                         : null;
 
 
-                /*
-                |--------------------------------------------------------------------------
-                | Signature
-                |--------------------------------------------------------------------------
-                */
+                    /*
+                    |--------------------------------------------------------------------------
+                    | BOOKING TIME
+                    |--------------------------------------------------------------------------
+                    */
 
-                $bookings->signature = select(
-                    'agreement_documents',
-                    '*',
-                    [
-                        ['booking_id', '=', $booking_id],
-                        ['document_type', '=', 'signature']
-                    ]
-                )->first();
-
-                if (
-                    isset($bookings->signature->document_file) &&
-                    !str_contains(
-                        $bookings->signature->document_file,
-                        'amazonaws.com'
-                    )
-                ) {
-
-                    $bookings->signature->document_file =
-                        baseURL(
-                            $bookings->signature->document_file
-                        );
-                }
+                    $bookings->booking_time =
+                        !empty($bookings->booking_time)
+                            ? $bookings->booking_time
+                            : null;
 
 
-                /*
-                |--------------------------------------------------------------------------
-                | Agreement
-                |--------------------------------------------------------------------------
-                */
+                    /*
+                    |--------------------------------------------------------------------------
+                    | SIGNATURE
+                    |--------------------------------------------------------------------------
+                    */
 
-                $bookings->agreementdocument = select(
-                    'agreement_documents',
-                    '*',
-                    [
-                        ['booking_id', '=', $booking_id],
-                        ['document_type', '=', 'agreement']
-                    ]
-                )->first();
+                    $bookings->signature = select(
+                        'agreement_documents',
+                        '*',
+                        [
+                            ['booking_id', '=', $booking_id],
+                            ['document_type', '=', 'signature']
+                        ]
+                    )->first();
 
 
-                /*
-                |--------------------------------------------------------------------------
-                | Customer
-                |--------------------------------------------------------------------------
-                */
+                    if (
+                        isset($bookings->signature->document_file) &&
+                        !str_contains(
+                            $bookings->signature->document_file,
+                            'amazonaws.com'
+                        )
+                    ) {
 
-                $bookings->customer = !empty($bookings->customer_id)
-                    ? @select(
-                        'customers',
+                        $bookings->signature->document_file =
+                            baseURL(
+                                $bookings->signature->document_file
+                            );
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | AGREEMENT
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $bookings->agreementdocument = select(
+                        'agreement_documents',
+                        '*',
+                        [
+                            ['booking_id', '=', $booking_id],
+                            ['document_type', '=', 'agreement']
+                        ]
+                    )->first();
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CUSTOMER
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $bookings->customer =
+                        !empty($bookings->customer_id)
+                            ? @select(
+                                'customers',
+                                '*',
+                                [
+                                    ['status', '!=', 'Deleted'],
+                                    [
+                                        'customer_id',
+                                        '=',
+                                        $bookings->customer_id
+                                    ]
+                                ]
+                            )->first()
+                            : null;
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | SALON
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $bookings->salon_details = @select(
+                        'salon',
                         '*',
                         [
                             ['status', '!=', 'Deleted'],
-                            ['customer_id', '=', $bookings->customer_id]
+                            [
+                                'salon_id',
+                                '=',
+                                $bookings->salon_id
+                            ]
                         ]
-                    )->first()
-                    : null;
+                    )->first();
 
 
-                /*
-                |--------------------------------------------------------------------------
-                | Salon
-                |--------------------------------------------------------------------------
-                */
+                    if (
+                        isset($bookings->salon_details->thumbnail) &&
+                        !str_contains(
+                            $bookings->salon_details->thumbnail,
+                            'amazonaws.com'
+                        )
+                    ) {
 
-                $bookings->salon_details = @select(
-                    'salon',
-                    '*',
-                    [
-                        ['status', '!=', 'Deleted'],
-                        ['salon_id', '=', $bookings->salon_id]
-                    ]
-                )->first();
+                        $bookings->salon_details->thumbnail =
+                            baseURL(
+                                @$bookings->salon_details->salon_thumbnail
+                            );
+                    }
 
-                if (
-                    isset($bookings->salon_details->thumbnail) &&
-                    !str_contains(
-                        $bookings->salon_details->thumbnail,
-                        'amazonaws.com'
-                    )
-                ) {
 
-                    $bookings->salon_details->thumbnail =
-                        baseURL(
-                            @$bookings->salon_details->salon_thumbnail
-                        );
+                    /*
+                    |--------------------------------------------------------------------------
+                    | WORKER
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $bookings->worker_name = null;
+
+                    if (!empty($bookings->worker_id)) {
+
+                        $bookings->worker_name = @select(
+                            'salon_worker',
+                            '*',
+                            [
+                                ['status', '!=', 'Deleted'],
+                                [
+                                    'worker_id',
+                                    '=',
+                                    $bookings->worker_id
+                                ]
+                            ]
+                        )->first();
+                    }
                 }
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | Worker
+                | CUSTOMER EMAIL
                 |--------------------------------------------------------------------------
                 */
 
-                $bookings->worker_name = null;
+                $lang = $request->post('preferred_lang')
+                    ?? $request->post('lang')
+                    ?? 'en';
+
+
+                $maildata = [];
+
+
+                if ($lang == 'en') {
+
+                    $maildata['subjecttext'] =
+                        'Your visit is waiting for confirmation. You will receive a message from us within 24 hours.';
+
+                    $maildata['deartext'] = 'Dear';
+
+                    $maildata['para2text'] =
+                        'Your booking details:';
+
+                    $maildata['bookingdatetext'] =
+                        'Booking Date';
+
+                    $maildata['slottext'] =
+                        'Appointment Time';
+
+                    $maildata['servicetext'] =
+                        'Service';
+
+                    $maildata['footerpara1text'] =
+                        'If you have additional questions or need help, please contact us at:';
+
+                    $maildata['contactno1'] =
+                        'SHOWROOMS POLAND : +48578903292';
+
+                    $maildata['contactno2'] =
+                        'SHOWROOMS SPAIN : +34651439815';
+
+                    $maildata['footerpara2text'] =
+                        'Thank you for choosing Hollywood Hair, we hope it will be a unique experience for you.';
+
+                    $maildata['footerpara3text'] =
+                        'Best regards';
+                }
+
+
+                if ($lang == 'es') {
+
+                    $maildata['subjecttext'] =
+                        'Su visita está pendiente de confirmación. Recibirá un mensaje nuestro dentro de las 24 horas.';
+
+                    $maildata['deartext'] = 'Estimado';
+
+                    $maildata['para2text'] =
+                        'Los datos de tu reserva:';
+
+                    $maildata['bookingdatetext'] =
+                        'Fecha de reserva';
+
+                    $maildata['slottext'] =
+                        'Hora de la cita';
+
+                    $maildata['servicetext'] =
+                        'Servicio';
+
+                    $maildata['footerpara1text'] =
+                        'Si tiene preguntas adicionales o necesita ayuda, contáctenos en:';
+
+                    $maildata['contactno1'] =
+                        'SALA DE EXPOSICIONES POLONIA : +48578903292';
+
+                    $maildata['contactno2'] =
+                        'SALAS DE EXPOSICIÓN ESPAÑA : +34651439815';
+
+                    $maildata['footerpara2text'] =
+                        'Gracias por elegir Hollywood Hair, esperamos que sea una experiencia única para ti.';
+
+                    $maildata['footerpara3text'] =
+                        'Atentamente';
+                }
+
+
+                if ($lang == 'pl') {
+
+                    $maildata['subjecttext'] =
+                        'Twoja wizyta czeka na potwierdzenie. W ciągu 24h otrzymasz od nas wiadomość.';
+
+                    $maildata['deartext'] = 'Hej';
+
+                    $maildata['para2text'] =
+                        'Szczegóły Twojej rezerwacji:';
+
+                    $maildata['bookingdatetext'] =
+                        'Data wizyty';
+
+                    $maildata['slottext'] =
+                        'Godziny zabiegu';
+
+                    $maildata['servicetext'] =
+                        'Usługa';
+
+                    $maildata['footerpara1text'] =
+                        'Jeśli masz dodatkowe pytania lub potrzebujesz pomocy, skontaktuj się z nami pod numerem:';
+
+                    $maildata['contactno1'] =
+                        'SALONY POLSKA : +48578903292';
+
+                    $maildata['contactno2'] =
+                        'SALONY HISZPANIA : +34651439815';
+
+                    $maildata['footerpara2text'] =
+                        'Dziękujemy za wybór Hollywood Hair, mamy nadzieję, że będzie to dla Ciebie wyjątkowe doświadczenie.';
+
+                    $maildata['footerpara3text'] =
+                        'Pozdrawiamy';
+                }
+
 
                 /*
-                * If worker_id was supplied, return it.
-                * Worker name can be populated later through the
-                * existing worker lookup if required.
+                |--------------------------------------------------------------------------
+                | SEND EMAIL
+                |--------------------------------------------------------------------------
                 */
+
+                $maildata['to'] = $request->post('email');
+
+                $maildata['subject'] =
+                    empty($booking_id)
+                        ? 'Appointment Booked'
+                        : (
+                            $notificationType === 'appointment_updated'
+                                ? 'Appointment Updated'
+                                : 'Appointment Booked'
+                        );
+
+                $maildata['view_name'] = 'bookinginfo';
+
+                $maildata['name'] =
+                    $request->post('customer_name');
+
+                $maildata['email'] =
+                    $request->post('email');
+
+                $maildata['booking_details'] =
+                    $bookings;
+
+
+                if (!empty($maildata['email'])) {
+
+                    sendMail($maildata);
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CUSTOMER NOTIFICATION
+                |--------------------------------------------------------------------------
+                */
+
+                $title =
+                    $notificationTranslations[$notificationType]['en']['subject'];
+
+
+                $msg =
+                    $notificationTranslations[$notificationType]['en']['message'];
+
+
+                $salonName = !empty($salon->salon_name_en)
+                    ? $salon->salon_name_en
+                    : '';
+
+
+                if (!empty($salonName)) {
+
+                    $msg .= ' at ' . $salonName;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | SPANISH
+                |--------------------------------------------------------------------------
+                */
+
+                $subject_es =
+                    $notificationTranslations[$notificationType]['es']['subject'];
+
+
+                $message_es =
+                    $notificationTranslations[$notificationType]['es']['message'];
+
+
+                if (!empty($salonName)) {
+
+                    $message_es .= ' en ' . $salonName;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | POLISH
+                |--------------------------------------------------------------------------
+                */
+
+                $subject_pl =
+                    $notificationTranslations[$notificationType]['pl']['subject'];
+
+
+                $message_pl =
+                    $notificationTranslations[$notificationType]['pl']['message'];
+
+
+                if (!empty($salonName)) {
+
+                    $message_pl .= ' w ' . $salonName;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CUSTOMER NOTIFICATION RECORD
+                |--------------------------------------------------------------------------
+                */
+
+                $notificationData = [
+
+                    'customer_id' =>
+                        @$bookings->customer_id,
+
+                    'subject' =>
+                        $title,
+
+                    'message' =>
+                        $msg,
+
+                    'subject_es' =>
+                        $subject_es,
+
+                    'message_es' =>
+                        $message_es,
+
+                    'subject_pl' =>
+                        $subject_pl,
+
+                    'message_pl' =>
+                        $message_pl,
+
+                    'notification_type' =>
+                        'customer',
+
+                    'booking_id' =>
+                        $bookings->booking_id
+                ];
+
+
+                insert(
+                    'notification',
+                    $notificationData
+                );
+
+
+                $customer = @select(
+                    'customers',
+                    '*',
+                    [
+                        ['status', '=', 'Active'],
+                        [
+                            'customer_id',
+                            '=',
+                            @$bookings->customer_id
+                        ]
+                    ]
+                )->first();
+
+
+                @sendCustomerFirebaseNotification(
+                    @$customer->shopify_user_id,
+                    $msg,
+                    $title
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | SALON NOTIFICATION
+                |--------------------------------------------------------------------------
+                */
+
+                $salonNotificationData = [
+
+                    'salon_id' =>
+                        @$bookings->salon_id,
+
+                    'subject' =>
+                        $salontitle,
+
+                    'message' =>
+                        $salonmsg,
+
+                    'subject_es' =>
+                        $subject_es,
+
+                    'message_es' =>
+                        $message_es,
+
+                    'subject_pl' =>
+                        $subject_pl,
+
+                    'message_pl' =>
+                        $message_pl,
+
+                    'notification_type' =>
+                        'salon',
+
+                    'booking_id' =>
+                        $bookings->booking_id
+                ];
+
+
+                insert(
+                    'notification',
+                    $salonNotificationData
+                );
+
+
+                sendFirebaseNotification(
+                    @$bookings->salon_id,
+                    $salonmsg,
+                    $salontitle
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | RESPONSE
+                |--------------------------------------------------------------------------
+                */
+
+                return response()->json([
+                    'result' => 1,
+                    'msg' => 'Booked successfully.',
+                    'data' => $bookings
+                ], 200);
             }
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | 20. CUSTOMER EMAIL
-            |--------------------------------------------------------------------------
-            */
-
-            $lang = $request->post('preferred_lang')
-                ?? $request->post('lang')
-                ?? 'en';
-
-            $maildata = [];
-
-
-            if ($lang == 'en') {
-
-                $maildata['subjecttext'] =
-                    'Your visit is waiting for confirmation. You will receive a message from us within 24 hours.';
-
-                $maildata['deartext'] = 'Dear';
-
-                $maildata['para2text'] =
-                    'Your booking details:';
-
-                $maildata['bookingdatetext'] =
-                    'Booking Date';
-
-                $maildata['slottext'] =
-                    'Appointment Time';
-
-                $maildata['servicetext'] =
-                    'Service';
-
-                $maildata['footerpara1text'] =
-                    'If you have additional questions or need help, please contact us at:';
-
-                $maildata['contactno1'] =
-                    'SHOWROOMS POLAND : +48578903292';
-
-                $maildata['contactno2'] =
-                    'SHOWROOMS SPAIN : +34651439815';
-
-                $maildata['footerpara2text'] =
-                    'Thank you for choosing Hollywood Hair, we hope it will be a unique experience for you.';
-
-                $maildata['footerpara3text'] =
-                    'Best regards';
-            }
-
-
-            if ($lang == 'es') {
-
-                $maildata['subjecttext'] =
-                    'Su visita está pendiente de confirmación. Recibirá un mensaje nuestro dentro de las 24 horas.';
-
-                $maildata['deartext'] = 'Estimado';
-
-                $maildata['para2text'] =
-                    'Los datos de tu reserva:';
-
-                $maildata['bookingdatetext'] =
-                    'Fecha de reserva';
-
-                $maildata['slottext'] =
-                    'Hora de la cita';
-
-                $maildata['servicetext'] =
-                    'Servicio';
-
-                $maildata['footerpara1text'] =
-                    'Si tiene preguntas adicionales o necesita ayuda, contáctenos en:';
-
-                $maildata['contactno1'] =
-                    'SALA DE EXPOSICIONES POLONIA : +48578903292';
-
-                $maildata['contactno2'] =
-                    'SALAS DE EXPOSICIÓN ESPAÑA : +34651439815';
-
-                $maildata['footerpara2text'] =
-                    'Gracias por elegir Hollywood Hair, esperamos que sea una experiencia única para ti.';
-
-                $maildata['footerpara3text'] =
-                    'Atentamente';
-            }
-
-
-            if ($lang == 'pl') {
-
-                $maildata['subjecttext'] =
-                    'Twoja wizyta czeka na potwierdzenie. W ciągu 24h otrzymasz od nas wiadomość.';
-
-                $maildata['deartext'] = 'Hej';
-
-                $maildata['para2text'] =
-                    'Szczegóły Twojej rezerwacji:';
-
-                $maildata['bookingdatetext'] =
-                    'Data wizyty';
-
-                $maildata['slottext'] =
-                    'Godziny zabiegu';
-
-                $maildata['servicetext'] =
-                    'Usługa';
-
-                $maildata['footerpara1text'] =
-                    'Jeśli masz dodatkowe pytania lub potrzebujesz pomocy, skontaktuj się z nami pod numerem:';
-
-                $maildata['contactno1'] =
-                    'SALONY POLSKA : +48578903292';
-
-                $maildata['contactno2'] =
-                    'SALONY HISZPANIA : +34651439815';
-
-                $maildata['footerpara2text'] =
-                    'Dziękujemy za wybór Hollywood Hair, mamy nadzieję, że będzie to dla Ciebie wyjątkowe doświadczenie.';
-
-                $maildata['footerpara3text'] =
-                    'Pozdrawiamy';
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | 21. SEND EMAIL
-            |--------------------------------------------------------------------------
-            */
-
-            $maildata['to'] = $request->post('email');
-            $maildata['subject'] = 'Appointment Booked';
-            $maildata['view_name'] = 'bookinginfo';
-            $maildata['name'] = $request->post('customer_name');
-            $maildata['email'] = $request->post('email');
-            $maildata['booking_details'] = $bookings;
-
-            if (!empty($maildata['email'])) {
-                sendMail($maildata);
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | 22. NOTIFICATIONS
-            |--------------------------------------------------------------------------
-            */
-
-            $notificationTranslations = [
-                'appointment_booked' => [
-                    'en' => [
-                        'subject' => 'Appointment Booked',
-                        'message' => 'New booking has been successful',
-                    ],
-                    'es' => [
-                        'subject' => 'Cita reservada',
-                        'message' => 'La nueva reserva se ha realizado correctamente',
-                    ],
-                    'pl' => [
-                        'subject' => 'Wizyta zarezerwowana',
-                        'message' => 'Nowa rezerwacja została pomyślnie dokonana',
-                    ],
-                ],
-            ];
-
-
-            $salonName = !empty($salon->salon_name_en)
-                ? $salon->salon_name_en
-                : '';
-
-
-            $title =
-                $notificationTranslations['appointment_booked']['en']['subject'];
-
-            $msg =
-                $notificationTranslations['appointment_booked']['en']['message'];
-
-
-            if (!empty($salonName)) {
-                $msg .= ' at ' . $salonName;
-            }
-
-
-            $subject_es =
-                $notificationTranslations['appointment_booked']['es']['subject'];
-
-            $message_es =
-                $notificationTranslations['appointment_booked']['es']['message'];
-
-
-            if (!empty($salonName)) {
-                $message_es .= ' en ' . $salonName;
-            }
-
-
-            $subject_pl =
-                $notificationTranslations['appointment_booked']['pl']['subject'];
-
-            $message_pl =
-                $notificationTranslations['appointment_booked']['pl']['message'];
-
-
-            if (!empty($salonName)) {
-                $message_pl .= ' w ' . $salonName;
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | 23. CUSTOMER NOTIFICATION
-            |--------------------------------------------------------------------------
-            */
-
-            $notificationData = [
-                'customer_id' => @$bookings->customer_id,
-                'subject' => $title,
-                'message' => $msg,
-                'subject_es' => $subject_es,
-                'message_es' => $message_es,
-                'subject_pl' => $subject_pl,
-                'message_pl' => $message_pl,
-                'notification_type' => 'customer',
-                'booking_id' => $bookings->booking_id
-            ];
-
-            insert(
-                'notification',
-                $notificationData
-            );
-
-
-            $customer = @select(
-                'customers',
-                '*',
-                [
-                    ['status', '=', 'Active'],
-                    ['customer_id', '=', @$bookings->customer_id]
-                ]
-            )->first();
-
-
-            @sendCustomerFirebaseNotification(
-                @$customer->shopify_user_id,
-                $msg,
-                $title
-            );
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | 24. SALON NOTIFICATION
-            |--------------------------------------------------------------------------
-            */
-
-            $salonNotificationData = [
-                'salon_id' => @$bookings->salon_id,
-                'subject' => 'New Appointment',
-                'message' => 'New booking has been made at your salon.',
-                'subject_es' => $subject_es,
-                'message_es' => $message_es,
-                'subject_pl' => $subject_pl,
-                'message_pl' => $message_pl,
-                'notification_type' => 'salon',
-                'booking_id' => $bookings->booking_id
-            ];
-
-            insert(
-                'notification',
-                $salonNotificationData
-            );
-
-
-            sendFirebaseNotification(
-                @$bookings->salon_id,
-                'New booking has been made at your salon.',
-                'New Appointment'
-            );
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | 25. RESPONSE
-            |--------------------------------------------------------------------------
-            */
 
             return response()->json([
-                'result' => 1,
-                'msg' => 'Booked successfully.',
-                'data' => $bookings
-            ], 200);
+                'result' => -1,
+                'msg' => 'Something Went Wrong'
+            ]);
 
 
         } catch (\Exception $e) {
