@@ -684,6 +684,7 @@ class ServiceController extends Controller
 			$result = [
 				'salon_name_en' => $salon->salon_name_en ?? '',
             	'salon_address_en' => $salon->salon_address_en ?? '',
+				'salon_thumbnail' => $salon->salon_thumbnail ?? '',
 
 				'todayCollection' => $serviceModel->getCollectionByPeriod($salon_id, 'today'),
 				'weeklyCollection' => $serviceModel->getCollectionByPeriod($salon_id, 'week'),
