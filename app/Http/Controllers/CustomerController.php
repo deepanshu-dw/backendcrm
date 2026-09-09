@@ -360,7 +360,11 @@ class CustomerController extends Controller
                 return $item->customer_id;
             })->toArray();
             $booking = CustomerModel::getBookingsCustomerID($cid);
-            return response()->json(['result' => 1, 'msg' => 'Customer data found successfully', 'data' => $booking]);
+            if ($resultByEmail->isNotEmpty()){
+                return response()->json(['result' => -1, 'msg' => 'Customer data not found', 'data' => $booking]);
+            }else{
+                return response()->json(['result' => 1, 'msg' => 'Customer data found successfully', 'data' => $booking]);
+            }
         }
         if ($resultByPhone->isNotEmpty()) {
             $cids = $resultByPhone->map(function ($item) {
