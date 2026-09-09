@@ -2913,12 +2913,11 @@ class SalonController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'salon_id' => 'required',
-                'customer_name' => 'required'
+                'customer_name' => 'required|string|max:150'
             ], [
                 'required' => 'This :attribute is Required',
-                'array' => 'The :attribute must be an array',
-                'min' => 'Please select at least one service.',
-                'regex' => 'The booking time must be in 24-hour format (HH:mm).',
+                'string' => 'The :attribute must be a string',
+                'max' => 'The :attribute may not be greater than :max characters'
             ]);
 
             if ($validator->fails()) {
@@ -5881,6 +5880,347 @@ class SalonController extends Controller
             return response()->json(['result' => 1, 'msg' => 'Booking details updated successfully'], 200);
         } catch (\Exception $e) {
             return response()->json(['result' => -1, 'msg' => 'An error occurred: ' . $e->getMessage()]);
+        }
+    }
+
+    public function updateBookingV2(Request $request)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'booking_id' => 'required',
+                'salon_id' => 'required',
+
+                'category_id' => 'nullable',
+                'services' => 'nullable',
+                'booking_date' => 'nullable|date',
+                'booking_time' => [
+                    'nullable',
+                    'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'
+                ],
+                'worker_id' => 'nullable',
+            ], [
+                'required' => 'The :attribute is required',
+                'booking_time.regex' => 'The booking time must be in 24-hour HH:mm format.',
+                'booking_date.date' => 'The booking date must be a valid date.',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'result' => 0,
+                    'errors' => $validator->errors()->first()
+                ], 400);
+            }
+
+            $booking_id = $request->input('booking_id');
+            $salon_id = $request->input('salon_id');
+
+            /*
+            |--------------------------------------------------------------------------
+            | Get Existing Booking
+            |--------------------------------------------------------------------------
+            */
+
+            $booking = select('booking', '*', [
+                ['booking_id', '=', $booking_id],
+                ['status', '=', 'Active']
+            ])->first();
+
+            if (empty($booking)) {
+                return response()->json([
+                    'result' => 0,
+                    'msg' => 'Booking not found or inactive.'
+                ], 404);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Request Data
+            |--------------------------------------------------------------------------
+            */
+
+            $category_id = $request->input('category_id');
+            $visit_type = $request->input('visit_type');
+            $worker_id = $request->input('worker_id');
+
+            $booking_date = $request->input('booking_date');
+            $booking_time = $request->input('booking_time');
+
+            $preferred_lang = $request->input('preferred_lang');
+            $secondary_lang = $request->input('secondary_lang');
+
+            /*
+            |--------------------------------------------------------------------------
+            | Normalize Booking Date
+            |--------------------------------------------------------------------------
+            */
+
+            if (!empty($booking_date)) {
+                $booking_date = date('Y-m-d', strtotime($booking_date));
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Normalize Services
+            |--------------------------------------------------------------------------
+            */
+
+            $services = $request->input('services');
+
+            if (is_string($services)) {
+                $decodedServices = json_decode($services, true);
+
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $services = $decodedServices;
+                }
+            }
+
+            if (!empty($services) && !is_array($services)) {
+                return response()->json([
+                    'result' => 0,
+                    'msg' => 'Services must be an array.'
+                ], 400);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Validate Salon
+            |--------------------------------------------------------------------------
+            */
+
+            $salon = select('salon', '*', [
+                ['salon_id', '=', $salon_id],
+                ['status', '=', 'Active']
+            ])->first();
+
+            if (empty($salon)) {
+                return response()->json([
+                    'result' => 0,
+                    'msg' => 'Salon not found or inactive.'
+                ], 404);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Validate Category
+            |--------------------------------------------------------------------------
+            |
+            | Only validate category when it is supplied.
+            |
+            */
+
+            if (!empty($category_id)) {
+
+                $category = select('categories', '*', [
+                    ['id', '=', $category_id],
+                    ['status', '=', 'Active']
+                ])->first();
+
+                if (empty($category)) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' => 'Category not found or inactive.'
+                    ], 400);
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Validate Services
+            |--------------------------------------------------------------------------
+            |
+            | Services must:
+            | - Exist
+            | - Belong to selected category if category is supplied
+            | - Not be archived
+            |
+            */
+
+            if (!empty($services)) {
+
+                $services = array_values(array_filter($services, function ($service) {
+                    return $service !== null && $service !== '';
+                }));
+
+                if (empty($services)) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' => 'At least one valid service is required.'
+                    ], 400);
+                }
+
+                $serviceRecords = select(
+                    'services',
+                    ['service_id', 'category_id', 'service_time_taken'],
+                    [
+                        ['service_id', 'in', $services],
+                        ['is_archived', '=', 'no']
+                    ]
+                )->get();
+
+                if (count($serviceRecords) != count($services)) {
+                    return response()->json([
+                        'result' => 0,
+                        'msg' => 'One or more selected services are invalid or archived.'
+                    ], 400);
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Category Validation For Services
+                |--------------------------------------------------------------------------
+                */
+
+                if (!empty($category_id)) {
+
+                    foreach ($serviceRecords as $service) {
+
+                        if ((string) $service->category_id !== (string) $category_id) {
+
+                            return response()->json([
+                                'result' => 0,
+                                'msg' => 'One or more selected services do not belong to the selected category.'
+                            ], 400);
+                        }
+                    }
+                }
+
+                $servicesJson = json_encode($services);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Prepare Update Data
+            |--------------------------------------------------------------------------
+            |
+            | Only update fields which are actually supplied.
+            | Existing values remain unchanged when optional fields are omitted.
+            |
+            */
+
+            $updateData = [];
+
+            /*
+            |--------------------------------------------------------------------------
+            | Salon
+            |--------------------------------------------------------------------------
+            */
+
+            if (!empty($salon_id)) {
+                $updateData['salon_id'] = $salon_id;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Category
+            |--------------------------------------------------------------------------
+            */
+
+            if ($request->has('category_id')) {
+                $updateData['category_id'] = !empty($category_id)
+                    ? $category_id
+                    : null;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Worker
+            |--------------------------------------------------------------------------
+            */
+
+            if ($request->has('worker_id')) {
+                $updateData['worker_id'] = !empty($worker_id)
+                    ? $worker_id
+                    : null;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Visit Type
+            |--------------------------------------------------------------------------
+            */
+
+            if ($request->has('visit_type')) {
+                $updateData['visit_type'] = $visit_type;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Booking Date
+            |--------------------------------------------------------------------------
+            */
+
+            if ($request->has('booking_date')) {
+                $updateData['booking_date'] = !empty($booking_date)
+                    ? $booking_date
+                    : null;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Booking Time
+            |--------------------------------------------------------------------------
+            */
+
+            if ($request->has('booking_time')) {
+                $updateData['booking_time'] = !empty($booking_time)
+                    ? $booking_time
+                    : null;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Services
+            |--------------------------------------------------------------------------
+            */
+
+            if ($request->has('services')) {
+                $updateData['services'] = !empty($services)
+                    ? $servicesJson
+                    : null;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Languages
+            |--------------------------------------------------------------------------
+            */
+
+            if ($request->has('preferred_lang')) {
+                $updateData['preferred_lang'] = $preferred_lang;
+            }
+
+            if ($request->has('secondary_lang')) {
+                $updateData['secondary_lang'] = $secondary_lang;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update Booking
+            |--------------------------------------------------------------------------
+            */
+
+            if (!empty($updateData)) {
+                update('booking', 'booking_id', $booking_id, $updateData);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Response
+            |--------------------------------------------------------------------------
+            */
+
+            return response()->json([
+                'result' => 1,
+                'msg' => 'Booking details updated successfully'
+            ], 200);
+
+        } catch (\Exception $e) {
+
+            return response()->json([
+                'result' => -1,
+                'msg' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
         }
     }
 	
