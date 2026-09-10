@@ -6341,12 +6341,12 @@ class SalonController extends Controller
                     ]
                 );
 
-                if (count($serviceRecords) != count($services)) {
-                    return response()->json([
-                        'result' => 0,
-                        'msg' => 'One or more selected services are invalid or archived.'
-                    ], 400);
-                }
+                // if (count($serviceRecords) != count($services)) {
+                //     return response()->json([
+                //         'result' => 0,
+                //         'msg' => 'One or more selected services are invalid or archived.'
+                //     ], 400);
+                // }
 
                 /*
                 |--------------------------------------------------------------------------
