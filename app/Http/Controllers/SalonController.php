@@ -2913,7 +2913,7 @@ class SalonController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'salon_id' => 'required',
-                'customer_name' => 'required|string|max:150'
+                'customer_name' => 'required|string|max:48'
             ], [
                 'required' => 'This :attribute is Required',
                 'string' => 'The :attribute must be a string',
