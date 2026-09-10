@@ -3003,11 +3003,6 @@ class SalonController extends Controller
             */
 
             $salon_id = $request->post('salon_id');
-
-            /*
-            * IMPORTANT:
-            * This is the same create/update mechanism as old booking API.
-            */
             $booking_id = $request->post('booking_id');
             $note = $request->post('notes');
 
