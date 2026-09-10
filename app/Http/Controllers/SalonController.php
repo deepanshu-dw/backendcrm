@@ -2906,7 +2906,6 @@ class SalonController extends Controller
         }
     }
 
-
     public function bookingV2(Request $request)
     {
         try {
@@ -3010,6 +3009,7 @@ class SalonController extends Controller
             * This is the same create/update mechanism as old booking API.
             */
             $booking_id = $request->post('booking_id');
+            $note = $request->post('notes');
 
             $category_id = $request->post('category_id');
             $visit_type = $request->post('visit_type');
@@ -3534,6 +3534,9 @@ class SalonController extends Controller
                     'contact_no' => $request->has('phone')
                         ? $request->post('phone')
                         : $oldbookingdata->contact_no,
+                    'note'=> $request->has('notes')
+                        ? $request->post('notes')
+                        : $oldbookingdata->note,
 
                     'worker_id' => $request->has('worker_id')
                         ? (
@@ -6229,6 +6232,7 @@ class SalonController extends Controller
 
             $booking_date = $request->input('booking_date');
             $booking_time = $request->input('booking_time');
+            $note = $request->input('notes');
 
             $preferred_lang = $request->input('preferred_lang');
             $secondary_lang = $request->input('secondary_lang');
@@ -6391,6 +6395,10 @@ class SalonController extends Controller
 
             if (!empty($salon_id)) {
                 $updateData['salon_id'] = $salon_id;
+            }
+
+            if (!empty($note)) {
+                $updateData['note'] = $note;
             }
 
             /*
