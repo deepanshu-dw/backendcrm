@@ -3781,6 +3781,7 @@ class SalonController extends Controller
                     'booking_date' => $booking_date,
 
                     'booking_time' => $booking_time,
+                    'note' => $note,
 
                     /*
                     * V2 does not use legacy slots.
