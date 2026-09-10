@@ -4538,42 +4538,326 @@ class SalonController extends Controller
 	}
 
     public function getBookingDetails($lang = "en", $booking_id)
-    {
-        try {
-            if (!empty($booking_id)) {
-                // $data['customer'] =  $customerexist  = select('customers', '*', [['status', '!=', 'Deleted'], ['custmer_id', '=', $request->post('email')]])->first();
-                // $data['booking'] = select('booking', '*', [['booking_id', '=', $booking_id]])->first();
-                // $data['oldagreement']  = select('agreement', '*', [['booking_id', '=', $booking_id], ['agreement_id', '=', @$oldbookingdata->agreement_id]])->first();
-                // $data['agreementdocument']  = select('agreement_documents', '*', [['booking_id', '=', $booking_id], ['document_type', '=', 'agreement']])->first();
-                // $data['signature']  = select('agreement_documents', '*', [['booking_id', '=', $booking_id], ['document_type', '=', 'signature']])->first();
-                $bookings = select('booking', '*', [['booking_id', '=', $booking_id]])->first();
-                if (!empty($bookings)) {
+{
+    try {
+        if (!empty($booking_id)) {
 
-                    $services = json_decode($bookings->services);
-                    $slots = json_decode($bookings->slots);
-                    if (empty($services)) {
-                        $bookings->servicedetails  = [];
-                    } else {
-                        $bookings->servicedetails = SalonModel::getServices($services, $lang);
-                    }
-                    if (empty($slots)) {
-                        $bookings->slotsdetails = [];
-                    } else {
-                        $bookings->slotsdetails = SalonModel::getSlots($slots, $lang);
-                    }
-                    $bookings->signature = select('agreement_documents', '*', [['booking_id', '=', $booking_id], ['document_type', '=', 'signature']])->first();
-                    $bookings->agreementdocument = select('agreement_documents', '*', [['booking_id', '=', $booking_id], ['document_type', '=', 'agreement']])->first();
-                    $bookings->customer = @select('customers', '*', [['status', '!=', 'Deleted'], ['customer_id', '=', $bookings->customer_id]])->first();
+            $bookings = select('booking', '*', [
+                ['booking_id', '=', $booking_id]
+            ])->first();
 
-                    $bookings->salon_details = @select('salon', '*', [['status', '!=', 'Deleted'], ['salon_id', '=', $bookings->salon_id]])->first();
-                    $bookings->worker_name = @select('salon_worker', '*', [['status', '!=', 'Deleted'], ['worker_id', '=', $bookings->worker_id]])->first();
+            if (!empty($bookings)) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Decode Services and Slots
+                |--------------------------------------------------------------------------
+                */
+
+                $services = json_decode($bookings->services, true);
+                $slots = json_decode($bookings->slots, true);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Service Details
+                |--------------------------------------------------------------------------
+                */
+
+                if (empty($services)) {
+                    $bookings->servicedetails = [];
+                } else {
+                    $bookings->servicedetails = SalonModel::getServices(
+                        $services,
+                        $lang
+                    );
                 }
-                return response()->json(['result' => 1, 'msg' => 'Booking Details.', 'data' => $bookings], 200);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Slot Details
+                |--------------------------------------------------------------------------
+                |
+                | This is kept for old bookings which still have slot IDs.
+                |
+                */
+
+                if (empty($slots)) {
+
+                    $bookings->slotsdetails = [];
+
+                } else {
+
+                    $bookings->slotsdetails = SalonModel::getSlots(
+                        $slots,
+                        $lang
+                    );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Old Booking - Get Booking Time From Slot
+                    |--------------------------------------------------------------------------
+                    |
+                    | If slots exist, booking time should come from the selected slot
+                    | instead of booking.booking_time.
+                    |
+                    */
+
+                    $firstSlot = $bookings->slotsdetails[0] ?? null;
+
+                    if (!empty($firstSlot)) {
+
+                        if (is_object($firstSlot) && isset($firstSlot->slot_time)) {
+
+                            $bookings->booking_time = date(
+                                'H:i',
+                                strtotime($firstSlot->slot_time)
+                            );
+
+                        } elseif (is_array($firstSlot) && isset($firstSlot['slot_time'])) {
+
+                            $bookings->booking_time = date(
+                                'H:i',
+                                strtotime($firstSlot['slot_time'])
+                            );
+                        }
+                    }
+
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | New V2 Booking - Use booking_time
+                |--------------------------------------------------------------------------
+                |
+                | If there are no slots, this is a V2 booking and the booking time
+                | already exists directly in booking.booking_time.
+                |
+                */
+
+                if (empty($slots) && !empty($bookings->booking_time)) {
+
+                    $bookings->booking_time = date(
+                        'H:i',
+                        strtotime($bookings->booking_time)
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Category Details
+                |--------------------------------------------------------------------------
+                |
+                | Category comes from booking.category_id.
+                |
+                */
+
+                $bookings->category_details = null;
+                $bookings->booking_type = null;
+
+                if (!empty($bookings->category_id)) {
+
+                    $category = select('categories', '*', [
+                        ['id', '=', $bookings->category_id]
+                    ])->first();
+
+                    if (!empty($category)) {
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Get Salon Category Configuration
+                        |--------------------------------------------------------------------------
+                        |
+                        | booking_slots are salon + category specific.
+                        |
+                        */
+
+                        $salonCategory = select(
+                            'salon_categories',
+                            '*',
+                            [
+                                ['salon_id', '=', $bookings->salon_id],
+                                ['category_id', '=', $bookings->category_id],
+                                ['status', '=', 'Active']
+                            ]
+                        )->first();
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Decode Category Booking Slots
+                        |--------------------------------------------------------------------------
+                        */
+
+                        $bookingSlots = [];
+
+                        if (!empty($salonCategory) && !empty($salonCategory->booking_slots)) {
+
+                            $bookingSlots = json_decode(
+                                $salonCategory->booking_slots,
+                                true
+                            );
+
+                            if (!is_array($bookingSlots)) {
+                                $bookingSlots = [];
+                            }
+                        }
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Add Booking Slots To Category Details
+                        |--------------------------------------------------------------------------
+                        */
+
+                        $category->booking_slots = $bookingSlots;
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Booking Type
+                        |--------------------------------------------------------------------------
+                        |
+                        | This must always come from categories.booking_type.
+                        |
+                        */
+
+                        $bookings->booking_type = $category->booking_type;
+
+                        $bookings->category_details = $category;
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Signature
+                |--------------------------------------------------------------------------
+                */
+
+                $bookings->signature = select(
+                    'agreement_documents',
+                    '*',
+                    [
+                        ['booking_id', '=', $booking_id],
+                        ['document_type', '=', 'signature']
+                    ]
+                )->first();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Agreement Document
+                |--------------------------------------------------------------------------
+                */
+
+                $bookings->agreementdocument = select(
+                    'agreement_documents',
+                    '*',
+                    [
+                        ['booking_id', '=', $booking_id],
+                        ['document_type', '=', 'agreement']
+                    ]
+                )->first();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Customer Details
+                |--------------------------------------------------------------------------
+                */
+
+                $bookings->customer = @select(
+                    'customers',
+                    '*',
+                    [
+                        ['status', '!=', 'Deleted'],
+                        ['customer_id', '=', $bookings->customer_id]
+                    ]
+                )->first();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Salon Details
+                |--------------------------------------------------------------------------
+                */
+
+                $bookings->salon_details = @select(
+                    'salon',
+                    '*',
+                    [
+                        ['status', '!=', 'Deleted'],
+                        ['salon_id', '=', $bookings->salon_id]
+                    ]
+                )->first();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Worker Details
+                |--------------------------------------------------------------------------
+                */
+
+                $bookings->worker_name = @select(
+                    'salon_worker',
+                    '*',
+                    [
+                        ['status', '!=', 'Deleted'],
+                        ['worker_id', '=', $bookings->worker_id]
+                    ]
+                )->first();
             }
-        } catch (\Exception $e) {
-            return response()->json(['result' => -1, 'msg' => 'An error occurred while processing your request: ' . $e->getMessage()], 500);
+
+            return response()->json([
+                'result' => 1,
+                'msg' => 'Booking Details.',
+                'data' => $bookings
+            ], 200);
         }
+
+        return response()->json([
+            'result' => 0,
+            'msg' => 'Booking ID is required.'
+        ], 400);
+
+    } catch (\Exception $e) {
+
+        return response()->json([
+            'result' => -1,
+            'msg' => 'An error occurred while processing your request: ' . $e->getMessage()
+        ], 500);
     }
+}
+
+    // public function getBookingDetails($lang = "en", $booking_id)
+    // {
+    //     try {
+    //         if (!empty($booking_id)) {
+    //             // $data['customer'] =  $customerexist  = select('customers', '*', [['status', '!=', 'Deleted'], ['custmer_id', '=', $request->post('email')]])->first();
+    //             // $data['booking'] = select('booking', '*', [['booking_id', '=', $booking_id]])->first();
+    //             // $data['oldagreement']  = select('agreement', '*', [['booking_id', '=', $booking_id], ['agreement_id', '=', @$oldbookingdata->agreement_id]])->first();
+    //             // $data['agreementdocument']  = select('agreement_documents', '*', [['booking_id', '=', $booking_id], ['document_type', '=', 'agreement']])->first();
+    //             // $data['signature']  = select('agreement_documents', '*', [['booking_id', '=', $booking_id], ['document_type', '=', 'signature']])->first();
+    //             $bookings = select('booking', '*', [['booking_id', '=', $booking_id]])->first();
+    //             if (!empty($bookings)) {
+
+    //                 $services = json_decode($bookings->services);
+    //                 $slots = json_decode($bookings->slots);
+    //                 if (empty($services)) {
+    //                     $bookings->servicedetails  = [];
+    //                 } else {
+    //                     $bookings->servicedetails = SalonModel::getServices($services, $lang);
+    //                 }
+    //                 if (empty($slots)) {
+    //                     $bookings->slotsdetails = [];
+    //                 } else {
+    //                     $bookings->slotsdetails = SalonModel::getSlots($slots, $lang);
+    //                 }
+    //                 $bookings->signature = select('agreement_documents', '*', [['booking_id', '=', $booking_id], ['document_type', '=', 'signature']])->first();
+    //                 $bookings->agreementdocument = select('agreement_documents', '*', [['booking_id', '=', $booking_id], ['document_type', '=', 'agreement']])->first();
+    //                 $bookings->customer = @select('customers', '*', [['status', '!=', 'Deleted'], ['customer_id', '=', $bookings->customer_id]])->first();
+
+    //                 $bookings->salon_details = @select('salon', '*', [['status', '!=', 'Deleted'], ['salon_id', '=', $bookings->salon_id]])->first();
+    //                 $bookings->worker_name = @select('salon_worker', '*', [['status', '!=', 'Deleted'], ['worker_id', '=', $bookings->worker_id]])->first();
+    //             }
+    //             return response()->json(['result' => 1, 'msg' => 'Booking Details.', 'data' => $bookings], 200);
+    //         }
+    //     } catch (\Exception $e) {
+    //         return response()->json(['result' => -1, 'msg' => 'An error occurred while processing your request: ' . $e->getMessage()], 500);
+    //     }
+    // }
 
     public function getBookings(Request $request, $lang = "en", $status = null, $salon_id = null, $visit_type = null, $booking_date = null)
     {
