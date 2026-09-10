@@ -119,7 +119,7 @@ Route::group(['prefix' => 'salons'], function () {
     Route::post('/updateB', [SalonController::class, 'updateB']);
     //Route::post('getSalonStats',[SalonController::class,'getSalonStats']);
     Route::post('/updateWeekend', [SalonController::class, 'updateWeekend']);
-    Route::post('/updateBooking', [SalonController::class, 'updateBookingV2']);
+    Route::post('/updateBookingV2', [SalonController::class, 'updateBookingV2']);
 	
 	Route::post('/addSalonNote', [SalonController::class, 'addSalonNote']);
 	Route::get('/getSalonNote/{salon_id}/{added_date}', [SalonController::class, 'getSalonNote']);
