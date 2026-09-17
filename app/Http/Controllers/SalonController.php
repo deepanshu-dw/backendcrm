@@ -2904,7 +2904,6 @@ class SalonController extends Controller
         }
     }
 
-
     public function bookingV2(Request $request)
     {
         try {
@@ -2954,12 +2953,6 @@ class SalonController extends Controller
                 }
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | NOTIFICATION TRANSLATIONS
-            |--------------------------------------------------------------------------
-            */
-
             $notificationTranslations = [
                 'appointment_booked' => [
                     'en' => [
@@ -2991,24 +2984,12 @@ class SalonController extends Controller
                 ],
             ];
 
-            /*
-            |--------------------------------------------------------------------------
-            | REQUEST DATA
-            |--------------------------------------------------------------------------
-            */
-
             $salon_id = $request->post('salon_id');
             $booking_id = $request->post('booking_id');
             $note = $request->post('notes');
             $category_id = $request->post('category_id');
             $visit_type = $request->post('visit_type');
             $worker_id = $request->post('worker_id');
-
-            /*
-            |--------------------------------------------------------------------------
-            | SERVICES
-            |--------------------------------------------------------------------------
-            */
 
             $services_array = null;
 
@@ -3027,18 +3008,9 @@ class SalonController extends Controller
                 }
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | BOOKING DATE
-            |--------------------------------------------------------------------------
-            */
-
             $booking_date = null;
 
-            if (
-                $request->has('booking_date') &&
-                !empty($request->post('booking_date'))
-            ) {
+            if ($request->has('booking_date') && !empty($request->post('booking_date'))) {
                 $booking_date = date(
                     'Y-m-d',
                     strtotime($request->post('booking_date'))
@@ -3053,10 +3025,7 @@ class SalonController extends Controller
 
             $booking_time = null;
 
-            if (
-                $request->has('booking_time') &&
-                !empty($request->post('booking_time'))
-            ) {
+            if ($request->has('booking_time') && !empty($request->post('booking_time'))) {
 
                 $booking_time = $request->post('booking_time');
 
@@ -3093,12 +3062,6 @@ class SalonController extends Controller
                 ]);
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | VALIDATE CATEGORY
-            |--------------------------------------------------------------------------
-            */
-
             $category = null;
 
             if (!empty($category_id)) {
@@ -3120,16 +3083,9 @@ class SalonController extends Controller
                 }
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | VALIDATE SERVICES
-            |--------------------------------------------------------------------------
-            */
-
             $services = null;
 
             if ($request->has('services')) {
-
                 $services_array = array_values(
                     array_filter(
                         $services_array ?? [],
@@ -3146,8 +3102,7 @@ class SalonController extends Controller
                     ]);
                 }
 
-                $serviceRecords = DB::table('services')
-                    ->select(
+                $serviceRecords = DB::table('services')->select(
                         'service_id',
                         'category_id',
                         'service_time_taken',
@@ -3217,16 +3172,13 @@ class SalonController extends Controller
             $customerexist = null;
 
             if (!empty($email)) {
-
-                $customerexist = select(
-                    'customers',
-                    '*',
-                    [
+                $customerexist = select('customers','*',[
                         ['status', '!=', 'Deleted'],
                         ['email', '=', $email]
                     ]
                 )->first();
             }
+            logger()->info('Customer Exist Check:', ['customerexist' => $customerexist ? $customerexist->customer_id : null, 'email' => $email, 'shopify_user_id' => $shopify_user_id]);
 
             /*
             |--------------------------------------------------------------------------
@@ -3264,17 +3216,6 @@ class SalonController extends Controller
                     'updated_at' => now()
                 ];
 
-                /*
-                |--------------------------------------------------------------------------
-                | UPDATE SHOPIFY USER ID
-                |--------------------------------------------------------------------------
-                |
-                | Only update when a valid/non-empty Shopify ID is received.
-                | If it is missing from the request, existing Shopify ID remains unchanged.
-                |
-                |--------------------------------------------------------------------------
-                */
-
                 if (!empty($shopify_user_id)) {
                     $customer['shopify_user_id'] = $shopify_user_id;
                 }
@@ -3288,12 +3229,6 @@ class SalonController extends Controller
 
                 $customer_id = $customerexist->customer_id;
             }
-
-            /*
-            |--------------------------------------------------------------------------
-            | NEW CUSTOMER
-            |--------------------------------------------------------------------------
-            */
 
             else {
 

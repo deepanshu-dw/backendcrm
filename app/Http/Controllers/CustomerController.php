@@ -256,7 +256,6 @@ class CustomerController extends Controller
         }
     }
 
-
     public function updateCustomer(Request $request, $customer_id)
     {
         $Validator = Validator::make($request->all(), [
@@ -322,7 +321,6 @@ class CustomerController extends Controller
             return response()->json(['result' => -1, 'msg' => 'No Record Found']);
         }
     }
-
 
     // public function searchCustomerByEmail(Request $request)
     // {
