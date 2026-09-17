@@ -642,7 +642,6 @@ class SalonController extends Controller
         }
     }
 
-
     public function updateSalon(Request $request,$salon_id ) 
     {
         try {
@@ -1663,7 +1662,6 @@ class SalonController extends Controller
         }
         return response()->json(['result' => 1, 'msg' => 'Token Id Updated']);
     }
-
 
     public function salonLogin(Request $request)
     {
@@ -2906,10 +2904,10 @@ class SalonController extends Controller
         }
     }
 
+
     public function bookingV2(Request $request)
     {
         try {
-
             $validator = Validator::make($request->all(), [
                 'salon_id' => 'required',
                 'customer_name' => 'required|string|max:48'
@@ -2927,6 +2925,7 @@ class SalonController extends Controller
             }
 
             if ($request->has('g-recaptcha-response')) {
+
                 $recaptcha_response = $request->input('g-recaptcha-response');
 
                 if (empty($recaptcha_response)) {
@@ -2955,7 +2954,6 @@ class SalonController extends Controller
                 }
             }
 
-
             /*
             |--------------------------------------------------------------------------
             | NOTIFICATION TRANSLATIONS
@@ -2963,7 +2961,6 @@ class SalonController extends Controller
             */
 
             $notificationTranslations = [
-
                 'appointment_booked' => [
                     'en' => [
                         'subject' => 'Appointment Booked',
@@ -2978,7 +2975,6 @@ class SalonController extends Controller
                         'message' => 'Nowa rezerwacja została pomyślnie dokonana',
                     ],
                 ],
-
                 'appointment_updated' => [
                     'en' => [
                         'subject' => 'Appointment Updated',
@@ -2995,7 +2991,6 @@ class SalonController extends Controller
                 ],
             ];
 
-
             /*
             |--------------------------------------------------------------------------
             | REQUEST DATA
@@ -3005,11 +3000,9 @@ class SalonController extends Controller
             $salon_id = $request->post('salon_id');
             $booking_id = $request->post('booking_id');
             $note = $request->post('notes');
-
             $category_id = $request->post('category_id');
             $visit_type = $request->post('visit_type');
             $worker_id = $request->post('worker_id');
-
 
             /*
             |--------------------------------------------------------------------------
@@ -3024,22 +3017,15 @@ class SalonController extends Controller
                 $services_input = $request->post('services');
 
                 if (is_array($services_input)) {
-
                     $services_array = $services_input;
-
                 } else {
-
-                    $services_array = json_decode(
-                        $services_input,
-                        true
-                    );
+                    $services_array = json_decode($services_input, true);
                 }
 
                 if (!is_array($services_array)) {
                     $services_array = [];
                 }
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -3053,13 +3039,11 @@ class SalonController extends Controller
                 $request->has('booking_date') &&
                 !empty($request->post('booking_date'))
             ) {
-
                 $booking_date = date(
                     'Y-m-d',
                     strtotime($request->post('booking_date'))
                 );
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -3080,14 +3064,12 @@ class SalonController extends Controller
                     '/^(?:[01]\d|2[0-3]):[0-5]\d$/',
                     $booking_time
                 )) {
-
                     return response()->json([
                         'result' => 0,
                         'msg' => 'The booking time must be in 24-hour format (HH:mm).'
                     ]);
                 }
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -3105,13 +3087,11 @@ class SalonController extends Controller
             )->first();
 
             if (empty($salon)) {
-
                 return response()->json([
                     'result' => -2,
                     'msg' => 'Salon not found.'
                 ]);
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -3133,14 +3113,12 @@ class SalonController extends Controller
                 )->first();
 
                 if (empty($category)) {
-
                     return response()->json([
                         'result' => -2,
                         'msg' => 'Category not found or inactive.'
                     ]);
                 }
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -3162,17 +3140,11 @@ class SalonController extends Controller
                 );
 
                 if (empty($services_array)) {
-
                     return response()->json([
                         'result' => -2,
                         'msg' => 'Please select at least one service.'
                     ]);
                 }
-
-
-                /*
-                * Get service records.
-                */
 
                 $serviceRecords = DB::table('services')
                     ->select(
@@ -3184,30 +3156,12 @@ class SalonController extends Controller
                     ->whereIn('service_id', $services_array)
                     ->get();
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | CHECK ALL SERVICES EXIST
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    $serviceRecords->count() !==
-                    count($services_array)
-                ) {
-
+                if ($serviceRecords->count() !== count($services_array)) {
                     return response()->json([
                         'result' => -2,
                         'msg' => 'One or more selected services were not found.'
                     ]);
                 }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | CHECK SERVICES CATEGORY
-                |--------------------------------------------------------------------------
-                */
 
                 if (!empty($category_id)) {
 
@@ -3217,7 +3171,6 @@ class SalonController extends Controller
                             (string) $service->category_id !==
                             (string) $category_id
                         ) {
-
                             return response()->json([
                                 'result' => -2,
                                 'msg' => 'All selected services must belong to the selected category.'
@@ -3226,20 +3179,12 @@ class SalonController extends Controller
                     }
                 }
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | CHECK SERVICES ACTIVE
-                |--------------------------------------------------------------------------
-                */
-
                 foreach ($serviceRecords as $service) {
 
                     if (
                         isset($service->is_archived) &&
                         strtolower($service->is_archived) !== 'no'
                     ) {
-
                         return response()->json([
                             'result' => -2,
                             'msg' => 'One or more selected services are no longer available.'
@@ -3247,20 +3192,21 @@ class SalonController extends Controller
                     }
                 }
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | STORE SERVICES
-                |--------------------------------------------------------------------------
-                */
-
                 $services = json_encode($services_array);
             }
-
 
             /*
             |--------------------------------------------------------------------------
             | CUSTOMER
+            |--------------------------------------------------------------------------
+            |
+            | Shopify logic:
+            |
+            | 1. Find existing customer by email.
+            | 2. If found, update Shopify ID only when request contains one.
+            | 3. If new customer, insert Shopify ID when provided.
+            | 4. Never overwrite an existing Shopify ID with null/empty value.
+            |
             |--------------------------------------------------------------------------
             */
 
@@ -3269,7 +3215,6 @@ class SalonController extends Controller
 
             $customer_id = null;
             $customerexist = null;
-
 
             if (!empty($email)) {
 
@@ -3283,11 +3228,15 @@ class SalonController extends Controller
                 )->first();
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | EXISTING CUSTOMER
+            |--------------------------------------------------------------------------
+            */
 
             if (!empty($customerexist)) {
 
                 $customer = [
-
                     'customer_name' => $request->has('customer_name')
                         ? $request->post('customer_name')
                         : $customerexist->customer_name,
@@ -3315,11 +3264,20 @@ class SalonController extends Controller
                     'updated_at' => now()
                 ];
 
+                /*
+                |--------------------------------------------------------------------------
+                | UPDATE SHOPIFY USER ID
+                |--------------------------------------------------------------------------
+                |
+                | Only update when a valid/non-empty Shopify ID is received.
+                | If it is missing from the request, existing Shopify ID remains unchanged.
+                |
+                |--------------------------------------------------------------------------
+                */
 
                 if (!empty($shopify_user_id)) {
                     $customer['shopify_user_id'] = $shopify_user_id;
                 }
-
 
                 update(
                     'customers',
@@ -3329,8 +3287,15 @@ class SalonController extends Controller
                 );
 
                 $customer_id = $customerexist->customer_id;
+            }
 
-            } else {
+            /*
+            |--------------------------------------------------------------------------
+            | NEW CUSTOMER
+            |--------------------------------------------------------------------------
+            */
+
+            else {
 
                 if (
                     !empty($email) ||
@@ -3344,31 +3309,26 @@ class SalonController extends Controller
                 ) {
 
                     $customer = [
-
                         'customer_name' => $request->post('customer_name'),
-
                         'gender' => $request->post('gender'),
-
                         'email' => $email,
-
                         'phone' => $request->post('phone'),
-
                         'age' => $request->post('age'),
-
                         'dob' => $request->post('dob'),
-
                         'pesel' => $request->post('pesel_no'),
-
                         'created_at' => now(),
-
                         'updated_at' => now()
                     ];
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | INSERT SHOPIFY USER ID
+                    |--------------------------------------------------------------------------
+                    */
 
                     if (!empty($shopify_user_id)) {
                         $customer['shopify_user_id'] = $shopify_user_id;
                     }
-
 
                     $customer_id = insert(
                         'customers',
@@ -3376,7 +3336,6 @@ class SalonController extends Controller
                     );
                 }
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -3387,24 +3346,19 @@ class SalonController extends Controller
             $signature_image = null;
             $contract_file = null;
 
-
             if ($request->hasFile('signature')) {
-
                 $signature_image = singleAwsUpload(
                     $request,
                     'signature'
                 );
             }
 
-
             if ($request->hasFile('contract_file')) {
-
                 $contract_file = singleAwsUpload(
                     $request,
                     'contract_file'
                 );
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -3416,25 +3370,13 @@ class SalonController extends Controller
                 ? $request->post('payment_type')
                 : 'cash';
 
-
             /*
             |--------------------------------------------------------------------------
             | CREATE / UPDATE BOOKING
             |--------------------------------------------------------------------------
-            |
-            | IMPORTANT:
-            |
-            | Same behavior as OLD booking() API:
-            |
-            | booking_id exists -> UPDATE
-            |
-            | booking_id empty -> CREATE
-            |
-            |--------------------------------------------------------------------------
             */
 
             if (!empty($booking_id)) {
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -3451,21 +3393,12 @@ class SalonController extends Controller
                     ]
                 )->first();
 
-
                 if (empty($oldbookingdata)) {
-
                     return response()->json([
                         'result' => -2,
                         'msg' => 'Booking not found or inactive.'
                     ]);
                 }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | EXISTING AGREEMENT
-                |--------------------------------------------------------------------------
-                */
 
                 $oldagreement = select(
                     'agreement',
@@ -3477,13 +3410,6 @@ class SalonController extends Controller
                     ]
                 )->first();
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | EXISTING AGREEMENT DOCUMENT
-                |--------------------------------------------------------------------------
-                */
-
                 $oldagreementdocument = select(
                     'agreement_documents',
                     '*',
@@ -3493,13 +3419,6 @@ class SalonController extends Controller
                         ['status', '=', 'Active']
                     ]
                 )->first();
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | EXISTING SIGNATURE
-                |--------------------------------------------------------------------------
-                */
 
                 $oldagreementsignature = select(
                     'agreement_documents',
@@ -3511,15 +3430,7 @@ class SalonController extends Controller
                     ]
                 )->first();
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | UPDATE DATA
-                |--------------------------------------------------------------------------
-                */
-
                 $updatedata = [
-
                     'customer_id' => !empty($customer_id)
                         ? $customer_id
                         : $oldbookingdata->customer_id,
@@ -3529,7 +3440,8 @@ class SalonController extends Controller
                     'contact_no' => $request->has('phone')
                         ? $request->post('phone')
                         : $oldbookingdata->contact_no,
-                    'note'=> $request->has('notes')
+
+                    'note' => $request->has('notes')
                         ? $request->post('notes')
                         : $oldbookingdata->note,
 
@@ -3560,11 +3472,8 @@ class SalonController extends Controller
                         : $oldbookingdata->currency_code,
 
                     'is_confirmed' => 'no',
-
                     'isArchived' => 'no',
-
                     'agreement_id' => @$oldagreement->agreement_id,
-
                     'booking_status' => 'inprogress',
 
                     'contract_signed' => $request->has('contract_signed')
@@ -3595,9 +3504,6 @@ class SalonController extends Controller
                         ? $booking_time
                         : $oldbookingdata->booking_time,
 
-                    /*
-                    * V2 does not use legacy slots.
-                    */
                     'slots' => null,
 
                     'services' => $request->has('services')
@@ -3619,13 +3525,6 @@ class SalonController extends Controller
                     'status' => 'Active',
                 ];
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | UPDATE BOOKING
-                |--------------------------------------------------------------------------
-                */
-
                 update(
                     'booking',
                     'booking_id',
@@ -3633,15 +3532,7 @@ class SalonController extends Controller
                     $updatedata
                 );
 
-
                 $result = $booking_id;
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | UPDATE AGREEMENT DOCUMENT
-                |--------------------------------------------------------------------------
-                */
 
                 if (!empty($oldagreementdocument)) {
 
@@ -3655,13 +3546,6 @@ class SalonController extends Controller
                     );
                 }
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | UPDATE SIGNATURE
-                |--------------------------------------------------------------------------
-                */
-
                 if (!empty($signature_image)) {
 
                     deleteMultiple(
@@ -3671,7 +3555,6 @@ class SalonController extends Controller
                             'document_type' => 'signature'
                         ]
                     );
-
 
                     insert(
                         'agreement_documents',
@@ -3683,13 +3566,6 @@ class SalonController extends Controller
                     );
                 }
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | UPDATE CONTRACT
-                |--------------------------------------------------------------------------
-                */
-
                 if (!empty($contract_file)) {
 
                     deleteMultiple(
@@ -3699,7 +3575,6 @@ class SalonController extends Controller
                             'document_type' => 'contract'
                         ]
                     );
-
 
                     insert(
                         'agreement_documents',
@@ -3711,34 +3586,22 @@ class SalonController extends Controller
                     );
                 }
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | UPDATE NOTIFICATION
-                |--------------------------------------------------------------------------
-                */
-
                 $salontitle = "Appointment Updated";
                 $salonmsg = "Booking has been updated.";
-
                 $notificationType = 'appointment_updated';
+            }
 
+            /*
+            |--------------------------------------------------------------------------
+            | CREATE NEW BOOKING
+            |--------------------------------------------------------------------------
+            */
 
-            } else {
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | CREATE NEW BOOKING
-                |--------------------------------------------------------------------------
-                */
+            else {
 
                 $insertdata = [
-
                     'customer_id' => $customer_id,
-
                     'booking_for' => $request->post('customer_name'),
-
                     'contact_no' => $request->post('phone'),
 
                     'worker_id' => !empty($worker_id)
@@ -3752,120 +3615,66 @@ class SalonController extends Controller
                         : null,
 
                     'currency_id' => $request->post('currency_id'),
-
                     'currency_code' => $request->post('currency_code'),
-
                     'is_confirmed' => 'no',
-
                     'isArchived' => 'no',
-
                     'agreement_id' => null,
-
                     'booking_status' => 'Pending',
-
                     'contract_signed' => $request->post('contract_signed'),
-
                     'total_pay_amt' => $request->post('total_pay_amt'),
-
                     'payment_type' => $payment,
-
                     'pre_payment_made' => $request->post('pre_payment_made'),
-
                     'pre_payment_amt' => $request->post('pre_payment_amt'),
-
                     'booking_date' => $booking_date,
-
                     'booking_time' => $booking_time,
                     'note' => $note,
-
-                    /*
-                    * V2 does not use legacy slots.
-                    */
                     'slots' => null,
-
                     'services' => $services,
-
                     'visit_type' => $visit_type,
-
                     'preferred_lang' => $request->post('preferred_lang'),
-
                     'secondary_lang' => $request->post('secondary_lang'),
-
                     'status' => 'Active',
                 ];
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | INSERT BOOKING
-                |--------------------------------------------------------------------------
-                */
 
                 $result = insert(
                     'booking',
                     $insertdata
                 );
 
-
                 if (!$result) {
-
                     return response()->json([
                         'result' => -1,
                         'msg' => 'Something Went Wrong'
                     ]);
                 }
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | NEW BOOKING NOTIFICATION
-                |--------------------------------------------------------------------------
-                */
-
                 $salontitle = "New Appointment";
                 $salonmsg = "New booking has been made at your salon.";
-
                 $notificationType = 'appointment_booked';
             }
-
 
             /*
             |--------------------------------------------------------------------------
             | AGREEMENT
             |--------------------------------------------------------------------------
-            |
-            | Same important behavior as OLD booking API:
-            |
-            | Agreement is created ONLY for a NEW booking.
-            |
-            | It is NOT created again when booking_id exists.
-            |--------------------------------------------------------------------------
             */
 
             if ($result) {
 
-
                 if (empty($booking_id)) {
 
                     $agreement = [
-
                         'customer_id' => $customer_id,
-
                         'booking_id' => $result,
-
                         'is_signed' => 'yes',
-
                         'date_of_sign' => now(),
-
                         'status' => 'Active',
                     ];
-
 
                     $agreementresult = insert(
                         'agreement',
                         $agreement
                     );
-
 
                     if ($agreementresult) {
 
@@ -3878,7 +3687,6 @@ class SalonController extends Controller
                             ]
                         );
 
-
                         update(
                             'booking',
                             'booking_id',
@@ -3888,13 +3696,6 @@ class SalonController extends Controller
                             ]
                         );
                     }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | NEW SIGNATURE
-                    |--------------------------------------------------------------------------
-                    */
 
                     if (!empty($signature_image)) {
 
@@ -3907,13 +3708,6 @@ class SalonController extends Controller
                             ]
                         );
                     }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | NEW CONTRACT
-                    |--------------------------------------------------------------------------
-                    */
 
                     if (!empty($contract_file)) {
 
@@ -3928,7 +3722,6 @@ class SalonController extends Controller
                     }
                 }
 
-
                 /*
                 |--------------------------------------------------------------------------
                 | GET COMPLETE BOOKING
@@ -3936,7 +3729,6 @@ class SalonController extends Controller
                 */
 
                 $booking_id = $result;
-
 
                 $bookings = select(
                     'booking',
@@ -3946,23 +3738,11 @@ class SalonController extends Controller
                     ]
                 )->first();
 
-
                 if (!empty($bookings)) {
 
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SERVICES
-                    |--------------------------------------------------------------------------
-                    */
-
                     $booking_services = !empty($bookings->services)
-                        ? json_decode(
-                            $bookings->services,
-                            true
-                        )
+                        ? json_decode($bookings->services, true)
                         : [];
-
 
                     if (!empty($booking_services)) {
 
@@ -3976,44 +3756,17 @@ class SalonController extends Controller
                         $bookings->servicedetails = [];
                     }
 
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SLOTS
-                    |--------------------------------------------------------------------------
-                    */
-
                     $bookings->slotsdetails = [];
 
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | CATEGORY
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $bookings->category_details = !empty($category)
-                        ? $category
-                        : null;
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | BOOKING TIME
-                    |--------------------------------------------------------------------------
-                    */
+                    $bookings->category_details =
+                        !empty($category)
+                            ? $category
+                            : null;
 
                     $bookings->booking_time =
                         !empty($bookings->booking_time)
                             ? $bookings->booking_time
                             : null;
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SIGNATURE
-                    |--------------------------------------------------------------------------
-                    */
 
                     $bookings->signature = select(
                         'agreement_documents',
@@ -4024,7 +3777,6 @@ class SalonController extends Controller
                         ]
                     )->first();
 
-
                     if (
                         isset($bookings->signature->document_file) &&
                         !str_contains(
@@ -4032,19 +3784,11 @@ class SalonController extends Controller
                             'amazonaws.com'
                         )
                     ) {
-
                         $bookings->signature->document_file =
                             baseURL(
                                 $bookings->signature->document_file
                             );
                     }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | AGREEMENT
-                    |--------------------------------------------------------------------------
-                    */
 
                     $bookings->agreementdocument = select(
                         'agreement_documents',
@@ -4055,10 +3799,9 @@ class SalonController extends Controller
                         ]
                     )->first();
 
-
                     /*
                     |--------------------------------------------------------------------------
-                    | CUSTOMER
+                    | GET CUSTOMER INCLUDING SHOPIFY USER ID
                     |--------------------------------------------------------------------------
                     */
 
@@ -4078,13 +3821,6 @@ class SalonController extends Controller
                             )->first()
                             : null;
 
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SALON
-                    |--------------------------------------------------------------------------
-                    */
-
                     $bookings->salon_details = @select(
                         'salon',
                         '*',
@@ -4098,7 +3834,6 @@ class SalonController extends Controller
                         ]
                     )->first();
 
-
                     if (
                         isset($bookings->salon_details->thumbnail) &&
                         !str_contains(
@@ -4106,19 +3841,11 @@ class SalonController extends Controller
                             'amazonaws.com'
                         )
                     ) {
-
                         $bookings->salon_details->thumbnail =
                             baseURL(
                                 @$bookings->salon_details->salon_thumbnail
                             );
                     }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | WORKER
-                    |--------------------------------------------------------------------------
-                    */
 
                     $bookings->worker_name = null;
 
@@ -4139,7 +3866,6 @@ class SalonController extends Controller
                     }
                 }
 
-
                 /*
                 |--------------------------------------------------------------------------
                 | CUSTOMER EMAIL
@@ -4150,9 +3876,7 @@ class SalonController extends Controller
                     ?? $request->post('lang')
                     ?? 'en';
 
-
                 $maildata = [];
-
 
                 if ($lang == 'en') {
 
@@ -4160,18 +3884,10 @@ class SalonController extends Controller
                         'Your visit is waiting for confirmation. You will receive a message from us within 24 hours.';
 
                     $maildata['deartext'] = 'Dear';
-
-                    $maildata['para2text'] =
-                        'Your booking details:';
-
-                    $maildata['bookingdatetext'] =
-                        'Booking Date';
-
-                    $maildata['slottext'] =
-                        'Appointment Time';
-
-                    $maildata['servicetext'] =
-                        'Service';
+                    $maildata['para2text'] = 'Your booking details:';
+                    $maildata['bookingdatetext'] = 'Booking Date';
+                    $maildata['slottext'] = 'Appointment Time';
+                    $maildata['servicetext'] = 'Service';
 
                     $maildata['footerpara1text'] =
                         'If you have additional questions or need help, please contact us at:';
@@ -4189,28 +3905,19 @@ class SalonController extends Controller
                         'Best regards';
                 }
 
-
                 if ($lang == 'es') {
 
                     $maildata['subjecttext'] =
                         'Su visita está pendiente de confirmación. Recibirá un mensaje nuestro dentro de las 24 horas.';
 
                     $maildata['deartext'] = 'Estimado';
-
-                    $maildata['para2text'] =
-                        'Los datos de tu reserva:';
-
-                    $maildata['bookingdatetext'] =
-                        'Fecha de reserva';
-
-                    $maildata['slottext'] =
-                        'Hora de la cita';
-
-                    $maildata['servicetext'] =
-                        'Servicio';
+                    $maildata['para2text'] = 'Los datos de tu reserva:';
+                    $maildata['bookingdatetext'] = 'Fecha de reserva';
+                    $maildata['slottext'] = 'Hora de la cita';
+                    $maildata['servicetext'] = 'Servicio';
 
                     $maildata['footerpara1text'] =
-                        'Si tiene preguntas adicionales o necesita ayuda, contáctenos en:';
+                        'Si tiene preguntas adicionales y necesita ayuda, contáctenos en:';
 
                     $maildata['contactno1'] =
                         'SALA DE EXPOSICIONES POLONIA : +48578903292';
@@ -4225,25 +3932,18 @@ class SalonController extends Controller
                         'Atentamente';
                 }
 
-
                 if ($lang == 'pl') {
 
                     $maildata['subjecttext'] =
                         'Twoja wizyta czeka na potwierdzenie. W ciągu 24h otrzymasz od nas wiadomość.';
 
                     $maildata['deartext'] = 'Hej';
-
                     $maildata['para2text'] =
                         'Szczegóły Twojej rezerwacji:';
 
-                    $maildata['bookingdatetext'] =
-                        'Data wizyty';
-
-                    $maildata['slottext'] =
-                        'Godziny zabiegu';
-
-                    $maildata['servicetext'] =
-                        'Usługa';
+                    $maildata['bookingdatetext'] = 'Data wizyty';
+                    $maildata['slottext'] = 'Godziny zabiegu';
+                    $maildata['servicetext'] = 'Usługa';
 
                     $maildata['footerpara1text'] =
                         'Jeśli masz dodatkowe pytania lub potrzebujesz pomocy, skontaktuj się z nami pod numerem:';
@@ -4261,7 +3961,6 @@ class SalonController extends Controller
                         'Pozdrawiamy';
                 }
 
-
                 /*
                 |--------------------------------------------------------------------------
                 | SEND EMAIL
@@ -4271,31 +3970,18 @@ class SalonController extends Controller
                 $maildata['to'] = $request->post('email');
 
                 $maildata['subject'] =
-                    empty($booking_id)
-                        ? 'Appointment Booked'
-                        : (
-                            $notificationType === 'appointment_updated'
-                                ? 'Appointment Updated'
-                                : 'Appointment Booked'
-                        );
+                    $notificationType === 'appointment_updated'
+                        ? 'Appointment Updated'
+                        : 'Appointment Booked';
 
                 $maildata['view_name'] = 'bookinginfo';
-
-                $maildata['name'] =
-                    $request->post('customer_name');
-
-                $maildata['email'] =
-                    $request->post('email');
-
-                $maildata['booking_details'] =
-                    $bookings;
-
+                $maildata['name'] = $request->post('customer_name');
+                $maildata['email'] = $request->post('email');
+                $maildata['booking_details'] = $bookings;
 
                 if (!empty($maildata['email'])) {
-
                     sendMail($maildata);
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -4306,104 +3992,64 @@ class SalonController extends Controller
                 $title =
                     $notificationTranslations[$notificationType]['en']['subject'];
 
-
                 $msg =
                     $notificationTranslations[$notificationType]['en']['message'];
-
 
                 $salonName = !empty($salon->salon_name_en)
                     ? $salon->salon_name_en
                     : '';
 
-
                 if (!empty($salonName)) {
-
                     $msg .= ' at ' . $salonName;
                 }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | SPANISH
-                |--------------------------------------------------------------------------
-                */
 
                 $subject_es =
                     $notificationTranslations[$notificationType]['es']['subject'];
 
-
                 $message_es =
                     $notificationTranslations[$notificationType]['es']['message'];
 
-
                 if (!empty($salonName)) {
-
                     $message_es .= ' en ' . $salonName;
                 }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | POLISH
-                |--------------------------------------------------------------------------
-                */
 
                 $subject_pl =
                     $notificationTranslations[$notificationType]['pl']['subject'];
 
-
                 $message_pl =
                     $notificationTranslations[$notificationType]['pl']['message'];
 
-
                 if (!empty($salonName)) {
-
                     $message_pl .= ' w ' . $salonName;
                 }
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | CUSTOMER NOTIFICATION RECORD
-                |--------------------------------------------------------------------------
-                */
-
                 $notificationData = [
-
-                    'customer_id' =>
-                        @$bookings->customer_id,
-
-                    'subject' =>
-                        $title,
-
-                    'message' =>
-                        $msg,
-
-                    'subject_es' =>
-                        $subject_es,
-
-                    'message_es' =>
-                        $message_es,
-
-                    'subject_pl' =>
-                        $subject_pl,
-
-                    'message_pl' =>
-                        $message_pl,
-
-                    'notification_type' =>
-                        'customer',
-
-                    'booking_id' =>
-                        $bookings->booking_id
+                    'customer_id' => @$bookings->customer_id,
+                    'subject' => $title,
+                    'message' => $msg,
+                    'subject_es' => $subject_es,
+                    'message_es' => $message_es,
+                    'subject_pl' => $subject_pl,
+                    'message_pl' => $message_pl,
+                    'notification_type' => 'customer',
+                    'booking_id' => $bookings->booking_id
                 ];
-
 
                 insert(
                     'notification',
                     $notificationData
                 );
 
+                /*
+                |--------------------------------------------------------------------------
+                | GET FINAL CUSTOMER
+                |--------------------------------------------------------------------------
+                |
+                | Shopify ID is read from the database after customer
+                | creation/update, so the latest saved Shopify ID is used.
+                |
+                |--------------------------------------------------------------------------
+                */
 
                 $customer = @select(
                     'customers',
@@ -4418,13 +4064,21 @@ class SalonController extends Controller
                     ]
                 )->first();
 
+                /*
+                |--------------------------------------------------------------------------
+                | CUSTOMER FIREBASE NOTIFICATION
+                |--------------------------------------------------------------------------
+                |
+                | Send the saved Shopify user ID.
+                |
+                |--------------------------------------------------------------------------
+                */
 
                 @sendCustomerFirebaseNotification(
                     @$customer->shopify_user_id,
                     $msg,
                     $title
                 );
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -4433,48 +4087,27 @@ class SalonController extends Controller
                 */
 
                 $salonNotificationData = [
-
-                    'salon_id' =>
-                        @$bookings->salon_id,
-
-                    'subject' =>
-                        $salontitle,
-
-                    'message' =>
-                        $salonmsg,
-
-                    'subject_es' =>
-                        $subject_es,
-
-                    'message_es' =>
-                        $message_es,
-
-                    'subject_pl' =>
-                        $subject_pl,
-
-                    'message_pl' =>
-                        $message_pl,
-
-                    'notification_type' =>
-                        'salon',
-
-                    'booking_id' =>
-                        $bookings->booking_id
+                    'salon_id' => @$bookings->salon_id,
+                    'subject' => $salontitle,
+                    'message' => $salonmsg,
+                    'subject_es' => $subject_es,
+                    'message_es' => $message_es,
+                    'subject_pl' => $subject_pl,
+                    'message_pl' => $message_pl,
+                    'notification_type' => 'salon',
+                    'booking_id' => $bookings->booking_id
                 ];
-
 
                 insert(
                     'notification',
                     $salonNotificationData
                 );
 
-
                 sendFirebaseNotification(
                     @$bookings->salon_id,
                     $salonmsg,
                     $salontitle
                 );
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -4489,12 +4122,10 @@ class SalonController extends Controller
                 ], 200);
             }
 
-
             return response()->json([
                 'result' => -1,
                 'msg' => 'Something Went Wrong'
             ]);
-
 
         } catch (\Exception $e) {
 
@@ -5021,45 +4652,365 @@ class SalonController extends Controller
         }
 	}
 
+    // public function getCustomerBookingsByShopifyId(Request $request)
+    // {
+    //     try {
+    //         $lang = "en";
+    //         $shopify_user_id = $request->post('shopify_user_id');
+    //         $customer = @select('customers', '*', [['status', '=', 'Active'], ['shopify_user_id', '=', $shopify_user_id]])->first();
+    //         if (!empty($customer)) {
+    //             $bookings = select('booking', '*', ['customer_id' => @$customer->customer_id, 'status' => 'Active']);
+    //             foreach ($bookings as $key => $val) {
+    //                 $services = json_decode($val->services);
+    //                 $slots = json_decode($val->slots);
+    //                 if (empty($services)) {
+    //                     $val->servicedetails  = [];
+    //                 } else {
+    //                     //dd($services); die;
+    //                     $val->servicedetails = @SalonModel::getServices($services, $lang);
+    //                 }
+    //                 if (empty($slots)) {
+    //                     $val->slotsdetails = [];
+    //                 } else {
+    //                     $val->slotsdetails = @SalonModel::getSlots($slots, $lang);
+    //                 }
+    //                 $val->signature = select('agreement_documents', '*', [['booking_id', '=', $val->booking_id], ['document_type', '=', 'signature']])->first();
+    //                 $val->agreementdocument = select('agreement_documents', '*', [['booking_id', '=', $val->booking_id], ['document_type', '=', 'agreement']])->first();
+    //                 $val->customer = @select('customers', '*', [['status', '=', 'Active'], ['customer_id', '=', $val->customer_id]])->first();
+    //                 $salon_details = select('salon', '*', [['status', '=', 'Active'], ['salon_id', '=', $val->salon_id]])->first();
+    //                 $val->salon_details = !empty($salon_details) ? $salon_details : null;
+    //                 if (isset($val->salon_details->salon_thumbnail) && !str_contains($val->salon_details->salon_thumbnail, 'amazonaws.com')) {
+    //                     $val->salon_details->salon_thumbnail = !empty($val->salon_details->salon_thumbnail) ? baseURL(@$val->salon_details->salon_thumbnail) : null;
+    //                 }
+    //                 $val->worker_name = @select('salon_worker', '*', [['status', '=', 'Active'], ['worker_id', '=', $val->worker_id]])->first()->worker_name;
+    //             }
+
+    //             return response()->json(['result' => 1, 'msg' => 'Customer booking found.', 'data' => $bookings], 200);
+    //         } else {
+    //             return response()->json(['result' => -1, 'msg' => 'Bookings not found']);
+    //         }
+    //     } catch (\Exception $e) {
+    //         return response()->json(['result' => -1, 'msg' => 'An error occurred while processing your request: ' . $e->getMessage()], 500);
+    //     }
+    // }
+
     public function getCustomerBookingsByShopifyId(Request $request)
     {
         try {
             $lang = "en";
             $shopify_user_id = $request->post('shopify_user_id');
-            $customer = @select('customers', '*', [['status', '=', 'Active'], ['shopify_user_id', '=', $shopify_user_id]])->first();
+
+            $customer = @select('customers', '*', [
+                ['status', '=', 'Active'],
+                ['shopify_user_id', '=', $shopify_user_id]
+            ])->first();
+
             if (!empty($customer)) {
-                $bookings = select('booking', '*', ['customer_id' => @$customer->customer_id, 'status' => 'Active']);
+
+                $bookings = select('booking', '*', [
+                    'customer_id' => $customer->customer_id,
+                    'status' => 'Active'
+                ]);
+
                 foreach ($bookings as $key => $val) {
-                    $services = json_decode($val->services);
-                    $slots = json_decode($val->slots);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Decode Services and Slots
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $services = json_decode($val->services, true);
+                    $slots = json_decode($val->slots, true);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Service Details
+                    |--------------------------------------------------------------------------
+                    */
+
                     if (empty($services)) {
-                        $val->servicedetails  = [];
+
+                        $val->servicedetails = [];
+
                     } else {
-                        //dd($services); die;
-                        $val->servicedetails = @SalonModel::getServices($services, $lang);
+
+                        $val->servicedetails = @SalonModel::getServices($services,$lang);
                     }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Slot Details + Booking Time
+                    |--------------------------------------------------------------------------
+                    */
+
                     if (empty($slots)) {
+
                         $val->slotsdetails = [];
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | New V2 Booking
+                        |--------------------------------------------------------------------------
+                        |
+                        | New bookings do not have slot IDs.
+                        | Their booking time is directly stored in booking.booking_time.
+                        |
+                        */
+
+                        if (!empty($val->booking_time)) {
+
+                            $val->booking_time = date(
+                                'H:i',
+                                strtotime($val->booking_time)
+                            );
+                        }
+
                     } else {
-                        $val->slotsdetails = @SalonModel::getSlots($slots, $lang);
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Old Booking
+                        |--------------------------------------------------------------------------
+                        |
+                        | Old bookings have slot IDs.
+                        | Get the actual slot details and derive booking time from
+                        | the first selected slot.
+                        |
+                        */
+
+                        $val->slotsdetails = @SalonModel::getSlots(
+                            $slots,
+                            $lang
+                        );
+
+                        $firstSlot = $val->slotsdetails[0] ?? null;
+
+                        if (!empty($firstSlot)) {
+
+                            if (
+                                is_object($firstSlot) &&
+                                isset($firstSlot->slot_time)
+                            ) {
+
+                                $val->booking_time = date(
+                                    'H:i',
+                                    strtotime($firstSlot->slot_time)
+                                );
+
+                            } elseif (
+                                is_array($firstSlot) &&
+                                isset($firstSlot['slot_time'])
+                            ) {
+
+                                $val->booking_time = date(
+                                    'H:i',
+                                    strtotime($firstSlot['slot_time'])
+                                );
+                            }
+                        }
                     }
-                    $val->signature = select('agreement_documents', '*', [['booking_id', '=', $val->booking_id], ['document_type', '=', 'signature']])->first();
-                    $val->agreementdocument = select('agreement_documents', '*', [['booking_id', '=', $val->booking_id], ['document_type', '=', 'agreement']])->first();
-                    $val->customer = @select('customers', '*', [['status', '=', 'Active'], ['customer_id', '=', $val->customer_id]])->first();
-                    $salon_details = select('salon', '*', [['status', '=', 'Active'], ['salon_id', '=', $val->salon_id]])->first();
-                    $val->salon_details = !empty($salon_details) ? $salon_details : null;
-                    if (isset($val->salon_details->salon_thumbnail) && !str_contains($val->salon_details->salon_thumbnail, 'amazonaws.com')) {
-                        $val->salon_details->salon_thumbnail = !empty($val->salon_details->salon_thumbnail) ? baseURL(@$val->salon_details->salon_thumbnail) : null;
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Category Details
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $val->category_details = null;
+                    $val->booking_type = null;
+
+                    if (!empty($val->category_id)) {
+
+                        $category = select('categories', '*', [
+                            ['id', '=', $val->category_id]
+                        ])->first();
+
+                        if (!empty($category)) {
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Salon Category Configuration
+                            |--------------------------------------------------------------------------
+                            |
+                            | booking_slots are specific to salon + category.
+                            |
+                            */
+
+                            $salonCategory = select(
+                                'salon_categories',
+                                '*',
+                                [
+                                    ['salon_id', '=', $val->salon_id],
+                                    ['category_id', '=', $val->category_id],
+                                    ['status', '=', 'Active']
+                                ]
+                            )->first();
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Decode Booking Slots
+                            |--------------------------------------------------------------------------
+                            */
+
+                            $bookingSlots = [];
+
+                            if (
+                                !empty($salonCategory) &&
+                                !empty($salonCategory->booking_slots)
+                            ) {
+
+                                $bookingSlots = json_decode(
+                                    $salonCategory->booking_slots,
+                                    true
+                                );
+
+                                if (!is_array($bookingSlots)) {
+                                    $bookingSlots = [];
+                                }
+                            }
+
+                            $category->booking_slots = $bookingSlots;
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Booking Type
+                            |--------------------------------------------------------------------------
+                            |
+                            | Always comes from categories.booking_type.
+                            |
+                            */
+
+                            $val->booking_type = $category->booking_type;
+                            $val->category_details = $category;
+                        }
                     }
-                    $val->worker_name = @select('salon_worker', '*', [['status', '=', 'Active'], ['worker_id', '=', $val->worker_id]])->first()->worker_name;
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Signature
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $val->signature = select(
+                        'agreement_documents',
+                        '*',
+                        [
+                            ['booking_id', '=', $val->booking_id],
+                            ['document_type', '=', 'signature']
+                        ]
+                    )->first();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Agreement Document
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $val->agreementdocument = select(
+                        'agreement_documents',
+                        '*',
+                        [
+                            ['booking_id', '=', $val->booking_id],
+                            ['document_type', '=', 'agreement']
+                        ]
+                    )->first();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Customer Details
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $val->customer = @select(
+                        'customers',
+                        '*',
+                        [
+                            ['status', '=', 'Active'],
+                            ['customer_id', '=', $val->customer_id]
+                        ]
+                    )->first();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Salon Details
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $salon_details = @select(
+                        'salon',
+                        '*',
+                        [
+                            ['status', '=', 'Active'],
+                            ['salon_id', '=', $val->salon_id]
+                        ]
+                    )->first();
+
+                    $val->salon_details = !empty($salon_details)
+                        ? $salon_details
+                        : null;
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Salon Thumbnail
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        isset($val->salon_details->salon_thumbnail) &&
+                        !str_contains(
+                            $val->salon_details->salon_thumbnail,
+                            'amazonaws.com'
+                        )
+                    ) {
+
+                        $val->salon_details->salon_thumbnail =
+                            !empty($val->salon_details->salon_thumbnail)
+                                ? baseURL($val->salon_details->salon_thumbnail)
+                                : null;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Worker Details
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $worker = @select(
+                        'salon_worker',
+                        '*',
+                        [
+                            ['status', '=', 'Active'],
+                            ['worker_id', '=', $val->worker_id]
+                        ]
+                    )->first();
+
+                    $val->worker_name = !empty($worker)
+                        ? $worker->worker_name
+                        : null;
                 }
 
-                return response()->json(['result' => 1, 'msg' => 'Customer booking found.', 'data' => $bookings], 200);
+                return response()->json([
+                    'result' => 1,
+                    'msg' => 'Customer booking found.',
+                    'data' => $bookings
+                ], 200);
+
             } else {
-                return response()->json(['result' => -1, 'msg' => 'Bookings not found']);
+
+                return response()->json([
+                    'result' => -1,
+                    'msg' => 'Customer not found'
+                ]);
             }
+
         } catch (\Exception $e) {
-            return response()->json(['result' => -1, 'msg' => 'An error occurred while processing your request: ' . $e->getMessage()], 500);
+
+            return response()->json([
+                'result' => -1,
+                'msg' => 'An error occurred while processing your request: ' .
+                    $e->getMessage()
+            ], 500);
         }
     }
 
