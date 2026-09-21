@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 class ServiceController extends Controller
 {
 
-  	public function addService(Request $request)
+	public function addService(Request $request)
 	{
 		$validator = Validator::make($request->all(), [
 			'category_id' => 'required|integer|min:1',
@@ -38,7 +38,6 @@ class ServiceController extends Controller
 			'category_id.integer' => 'Category must be a valid number.',
 			'category_id.min' => 'Category must be greater than 0.',
 
-			// Service
 			'service_name_en.required' => 'Service Name is required.',
 			'service_name_en.string' => 'Service Name must be a string.',
 			'service_name_en.max' => 'Service Name is too long',
@@ -47,30 +46,24 @@ class ServiceController extends Controller
 			'service_description_en.string' => 'Service Description must be a string.',
 			'service_description_en.max' => 'Service Description is too long.',
 
-			// Customer Name - English
 			'customer_name_en.required' => 'Customer Name (English) is required.',
 			'customer_name_en.string' => 'Customer Name (English) must be a string.',
 			'customer_name_en.max' => 'Customer Name (English) is too long.',
 
-			// Customer Name - Spanish
 			'customer_name_es.required' => 'Customer Name (Spanish) is required.',
 			'customer_name_es.string' => 'Customer Name (Spanish) must be a string.',
 			'customer_name_es.max' => 'Customer Name (Spanish) is too long.',
 
-			// Customer Name - Polish
 			'customer_name_pl.required' => 'Customer Name (Polish) is required.',
 			'customer_name_pl.string' => 'Customer Name (Polish) must be a string.',
 			'customer_name_pl.max' => 'Customer Name (Polish) is too long',
 
-			// Price Type
 			'price_type.required' => 'Price Type is required.',
 			'price_type.in' => 'Invalid Price Type. Allowed values are fixed, from, or hair_weight.',
 
-			// Price Note
 			'price_note.string' => 'Price Note must be a string.',
 			'price_note.max' => 'Price Note is too long',
 
-			// Prices
 			'price_en.required' => 'Price (English) is required.',
 			'price_en.numeric' => 'Price (English) must be a valid number.',
 			'price_en.min' => 'Price (English) cannot be less than 0.',
@@ -83,37 +76,25 @@ class ServiceController extends Controller
 			'price_pl.numeric' => 'Price (Polish) must be a valid number.',
 			'price_pl.min' => 'Price (Polish) cannot be less than 0.',
 
-			// Service Time
 			'service_time_taken.required' => 'Service Time Taken is required.',
 			'service_time_taken.integer' => 'Service Time Taken must be a valid integer.',
 			'service_time_taken.min' => 'Service Time Taken must be at least 1 minute.',
 
-			// Archived
 			'is_archived.string' => 'Archive status must be a string.',
 			'is_archived.in' => 'Invalid archive status. Allowed values are Yes or No.',
 		]);
 
 		if ($validator->fails()) {
-            return response()->json([
-                "result" => 0,
-                "errors" => $validator->errors()->first(),
-            ]);
-        }
-
-		$serviceName = trim($request->input('service_name_en'));
-
-		if (ServiceModel::serviceNameExists($serviceName)) {
 			return response()->json([
-				'result' => 0,
-				'msg' => "This Service already exists. Please enter a unique service name.",
+				"result" => 0,
+				"errors" => $validator->errors()->first(),
 			]);
 		}
 
+		$serviceName = trim($request->input('service_name_en'));
+
 		$categoryId = (int) $request->input('category_id');
 
-		/*
-		* Validate that the category exists.
-		*/
 		$category = CategoryModel::getCategoryById($categoryId);
 
 		if (!$category) {
@@ -133,7 +114,7 @@ class ServiceController extends Controller
 		$service_thumbnail = null;
 
 		if (!empty($request->hasfile('service_thumbnail'))) {
-			$service_thumbnail = singleAwsUpload($request,'service_thumbnail');
+			$service_thumbnail = singleAwsUpload($request, 'service_thumbnail');
 		}
 
 		$insert = [
@@ -176,8 +157,7 @@ class ServiceController extends Controller
 			DB::table('activity_logs')->insert([
 				'admin_id' => $adminId,
 				'action' => 'Service Added',
-				'description' =>
-					"New service created: {$insert['service_name_en']}",
+				'description' => "New service created: {$insert['service_name_en']}",
 				'created_at' => now(),
 			]);
 		}
@@ -242,9 +222,6 @@ class ServiceController extends Controller
 			]);
 		}
 
-		/*
-		* Only active services can be updated.
-		*/
 		if ($service->status !== 'Active') {
 			return response()->json([
 				'result' => -1,
@@ -275,7 +252,6 @@ class ServiceController extends Controller
 			'category_id.integer' => 'Category must be a valid number.',
 			'category_id.min' => 'Category must be greater than 0.',
 
-			// Service
 			'service_name_en.required' => 'Service Name is required.',
 			'service_name_en.string' => 'Service Name must be a string.',
 			'service_name_en.max' => 'Service Name is too long',
@@ -284,30 +260,24 @@ class ServiceController extends Controller
 			'service_description_en.string' => 'Service Description must be a string.',
 			'service_description_en.max' => 'Service Description is too long.',
 
-			// Customer Name - English
 			'customer_name_en.required' => 'Customer Name (English) is required.',
 			'customer_name_en.string' => 'Customer Name (English) must be a string.',
 			'customer_name_en.max' => 'Customer Name (English) is too long.',
 
-			// Customer Name - Spanish
 			'customer_name_es.required' => 'Customer Name (Spanish) is required.',
 			'customer_name_es.string' => 'Customer Name (Spanish) must be a string.',
 			'customer_name_es.max' => 'Customer Name (Spanish) is too long.',
 
-			// Customer Name - Polish
 			'customer_name_pl.required' => 'Customer Name (Polish) is required.',
 			'customer_name_pl.string' => 'Customer Name (Polish) must be a string.',
 			'customer_name_pl.max' => 'Customer Name (Polish) is too long',
 
-			// Price Type
 			'price_type.required' => 'Price Type is required.',
 			'price_type.in' => 'Invalid Price Type. Allowed values are fixed, from, or hair_weight.',
 
-			// Price Note
 			'price_note.string' => 'Price Note must be a string.',
 			'price_note.max' => 'Price Note is too long',
 
-			// Prices
 			'price_en.required' => 'Price (English) is required.',
 			'price_en.numeric' => 'Price (English) must be a valid number.',
 			'price_en.min' => 'Price (English) cannot be less than 0.',
@@ -320,22 +290,20 @@ class ServiceController extends Controller
 			'price_pl.numeric' => 'Price (Polish) must be a valid number.',
 			'price_pl.min' => 'Price (Polish) cannot be less than 0.',
 
-			// Service Time
 			'service_time_taken.required' => 'Service Time Taken is required.',
 			'service_time_taken.integer' => 'Service Time Taken must be a valid integer.',
 			'service_time_taken.min' => 'Service Time Taken must be at least 1 minute.',
 
-			// Archived
 			'is_archived.string' => 'Archive status must be a string.',
 			'is_archived.in' => 'Invalid archive status. Allowed values are Yes or No.',
 		]);
 
 		if ($validator->fails()) {
-            return response()->json([
-                "result" => 0,
-                "errors" => $validator->errors()->first(),
-            ]);
-        }
+			return response()->json([
+				"result" => 0,
+				"errors" => $validator->errors()->first(),
+			]);
+		}
 
 		$allowedFields = [
 			'category_id',
@@ -364,15 +332,7 @@ class ServiceController extends Controller
 
 		if ($request->has('service_name_en')) {
 			$serviceName = trim($request->input('service_name_en'));
-
-			if (ServiceModel::serviceNameExists($serviceName,$serviceId)) {
-				return response()->json([
-					'result' => 0,
-					'msg' => "This Service already exists. Please enter a unique service name.",
-				]);
-			}
 		}
-
 
 		if ($request->has('category_id')) {
 			$categoryId = (int) $request->input('category_id');
@@ -380,11 +340,17 @@ class ServiceController extends Controller
 			$category = CategoryModel::getCategoryById($categoryId);
 
 			if (!$category) {
-				return response()->json(['result' => 0,'msg' => 'Please provide a valid category.']);
+				return response()->json([
+					'result' => 0,
+					'msg' => 'Please provide a valid category.'
+				]);
 			}
 
 			if ($category->status !== 'Active') {
-				return response()->json(['result' => 0,'msg' => 'Please provide an active category.']);
+				return response()->json([
+					'result' => 0,
+					'msg' => 'Please provide an active category.'
+				]);
 			}
 		}
 
@@ -442,15 +408,16 @@ class ServiceController extends Controller
 			$update['is_archived'] = $request->input('is_archived');
 		}
 
-		$service_thumbnail = null;
-
 		if (!empty($request->hasfile('service_thumbnail'))) {
-			$update['service_thumbnail'] = singleAwsUpload($request,'service_thumbnail');
+			$update['service_thumbnail'] = singleAwsUpload(
+				$request,
+				'service_thumbnail'
+			);
 		}
 
 		$update['updated_at'] = now();
 
-		$result = ServiceModel::updateService($update,$serviceId);
+		$result = ServiceModel::updateService($update, $serviceId);
 
 		if ($result === 0) {
 			return response()->json([

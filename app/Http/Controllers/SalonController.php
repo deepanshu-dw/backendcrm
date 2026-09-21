@@ -2909,7 +2909,8 @@ class SalonController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'salon_id' => 'required',
-                'customer_name' => 'required|string|max:48'
+                'customer_name' => 'required|string|max:48',
+                'booking_source' => 'required|string'
             ], [
                 'required' => 'This :attribute is Required',
                 'string' => 'The :attribute must be a string',
@@ -2990,6 +2991,7 @@ class SalonController extends Controller
             $category_id = $request->post('category_id');
             $visit_type = $request->post('visit_type');
             $worker_id = $request->post('worker_id');
+            $booking_source = $request->post('booking_source');
 
             $services_array = null;
 
@@ -3154,15 +3156,6 @@ class SalonController extends Controller
             |--------------------------------------------------------------------------
             | CUSTOMER
             |--------------------------------------------------------------------------
-            |
-            | Shopify logic:
-            |
-            | 1. Find existing customer by email.
-            | 2. If found, update Shopify ID only when request contains one.
-            | 3. If new customer, insert Shopify ID when provided.
-            | 4. Never overwrite an existing Shopify ID with null/empty value.
-            |
-            |--------------------------------------------------------------------------
             */
 
             $email = $request->post('email');
@@ -3178,7 +3171,6 @@ class SalonController extends Controller
                     ]
                 )->first();
             }
-            logger()->info('Customer Exist Check:', ['customerexist' => $customerexist ? $customerexist->customer_id : null, 'email' => $email, 'shopify_user_id' => $shopify_user_id]);
 
             /*
             |--------------------------------------------------------------------------
@@ -3228,9 +3220,7 @@ class SalonController extends Controller
                 );
 
                 $customer_id = $customerexist->customer_id;
-            }
-
-            else {
+            } else {
 
                 if (
                     !empty($email) ||
@@ -3254,12 +3244,6 @@ class SalonController extends Controller
                         'created_at' => now(),
                         'updated_at' => now()
                     ];
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | INSERT SHOPIFY USER ID
-                    |--------------------------------------------------------------------------
-                    */
 
                     if (!empty($shopify_user_id)) {
                         $customer['shopify_user_id'] = $shopify_user_id;
@@ -3457,6 +3441,8 @@ class SalonController extends Controller
                         ? $request->post('secondary_lang')
                         : $oldbookingdata->secondary_lang,
 
+                    'booking_source' => $booking_source,
+
                     'status' => 'Active',
                 ];
 
@@ -3524,15 +3510,7 @@ class SalonController extends Controller
                 $salontitle = "Appointment Updated";
                 $salonmsg = "Booking has been updated.";
                 $notificationType = 'appointment_updated';
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | CREATE NEW BOOKING
-            |--------------------------------------------------------------------------
-            */
-
-            else {
+            } else {
 
                 $insertdata = [
                     'customer_id' => $customer_id,
@@ -3568,6 +3546,7 @@ class SalonController extends Controller
                     'visit_type' => $visit_type,
                     'preferred_lang' => $request->post('preferred_lang'),
                     'secondary_lang' => $request->post('secondary_lang'),
+                    'booking_source' => $booking_source,
                     'status' => 'Active',
                 ];
 
@@ -3979,11 +3958,6 @@ class SalonController extends Controller
                 |--------------------------------------------------------------------------
                 | GET FINAL CUSTOMER
                 |--------------------------------------------------------------------------
-                |
-                | Shopify ID is read from the database after customer
-                | creation/update, so the latest saved Shopify ID is used.
-                |
-                |--------------------------------------------------------------------------
                 */
 
                 $customer = @select(
@@ -4002,10 +3976,6 @@ class SalonController extends Controller
                 /*
                 |--------------------------------------------------------------------------
                 | CUSTOMER FIREBASE NOTIFICATION
-                |--------------------------------------------------------------------------
-                |
-                | Send the saved Shopify user ID.
-                |
                 |--------------------------------------------------------------------------
                 */
 
@@ -6068,10 +6038,12 @@ class SalonController extends Controller
                     'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'
                 ],
                 'worker_id' => 'nullable',
+                'booking_source' => 'nullable|string',
             ], [
                 'required' => 'The :attribute is required',
                 'booking_time.regex' => 'The booking time must be in 24-hour HH:mm format.',
                 'booking_date.date' => 'The booking date must be a valid date.',
+                'booking_source.string' => 'The booking source must be a string.',
             ]);
 
             if ($validator->fails()) {
@@ -6111,6 +6083,7 @@ class SalonController extends Controller
             $category_id = $request->input('category_id');
             $visit_type = $request->input('visit_type');
             $worker_id = $request->input('worker_id');
+            $booking_source = $request->input('booking_source');
 
             $booking_date = $request->input('booking_date');
             $booking_time = $request->input('booking_time');
@@ -6315,6 +6288,16 @@ class SalonController extends Controller
 
             if ($request->has('visit_type')) {
                 $updateData['visit_type'] = $visit_type;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Booking Source
+            |--------------------------------------------------------------------------
+            */
+
+            if ($request->has('booking_source')) {
+                $updateData['booking_source'] = $booking_source;
             }
 
             /*

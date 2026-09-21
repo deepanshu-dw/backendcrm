@@ -14,20 +14,15 @@ class CategoryController extends Controller
     {
         $validator = Validator::make($request->all(), [
             "name" => "required|string|max:100",
-            "description" => "required|string|max:500",
             "booking_type" => "required|in:fixed_time,time_window",
             "service_ids" => "sometimes|nullable",
         ], [
             "name.required" => "Category Name is required.",
-            "name.string"   => "Category Name must be a string.",
-            "name.max"      => "Category Name is too long.",
-
-            "description.required" => "Description is required.",
-            "description.string"   => "Description must be a string.",
-            "description.max"      => "Description is too long.",
+            "name.string" => "Category Name must be a string.",
+            "name.max" => "Category Name is too long.",
 
             "booking_type.required" => "Booking Type is required.",
-            "booking_type.in"       => "Invalid booking type.",
+            "booking_type.in" => "Invalid booking type.",
 
             "service_ids" => "Invalid service IDs.",
         ]);
@@ -48,15 +43,10 @@ class CategoryController extends Controller
             ]);
         }
 
-        $serviceIds = $this->prepareServiceIds(
-            $request->input("service_ids"),
-            false
-        );
+        $serviceIds = $this->prepareServiceIds($request->input("service_ids"),false);
 
         if (!empty($serviceIds)) {
-            $invalidServiceResponse = $this->validateServicesForCategory(
-                $serviceIds
-            );
+            $invalidServiceResponse = $this->validateServicesForCategory($serviceIds);
 
             if ($invalidServiceResponse) {
                 return $invalidServiceResponse;
@@ -65,7 +55,7 @@ class CategoryController extends Controller
 
         $categoryInsert = [
             "name" => $categoryName,
-            "description" => trim($request->input("description")),
+            "description" => null,
             "booking_type" => $request->input("booking_type"),
             "status" => "Active",
             "created_at" => now(),
@@ -138,9 +128,7 @@ class CategoryController extends Controller
 
         $categoryIds = $categories
             ->pluck("id")
-            ->map(function ($categoryId) {
-                return (int) $categoryId;
-            })
+            ->map(function ($categoryId) {return (int) $categoryId;})
             ->toArray();
 
         $services = CategoryModel::getServicesByCategoryIds($categoryIds);
@@ -216,22 +204,17 @@ class CategoryController extends Controller
 
         $validator = Validator::make($request->all(), [
             "name" => "sometimes|required|string|max:100",
-            "description" => "sometimes|required|string|max:500",
             "image_url" => "sometimes|nullable|string|max:500",
             "booking_type" => "sometimes|required|in:fixed_time,time_window",
             "status" => "sometimes|required|in:Active,Inactive",
             "service_ids" => "sometimes|required",
-        ],[
+        ], [
             "name.required" => "Category Name is required.",
-            "name.string"   => "Category Name must be a string.",
-            "name.max"      => "Category Name is too long.",
-
-            "description.required" => "Description is required.",
-            "description.string"   => "Description must be a string.",
-            "description.max"      => "Description is too long.",
+            "name.string" => "Category Name must be a string.",
+            "name.max" => "Category Name is too long.",
 
             "booking_type.required" => "Booking Type is required.",
-            "booking_type.in"       => "Invalid booking type.",
+            "booking_type.in" => "Invalid booking type.",
 
             "service_ids" => "Invalid service IDs.",
         ]);
@@ -245,7 +228,6 @@ class CategoryController extends Controller
 
         $allowedFields = [
             "name",
-            "description",
             "image_url",
             "booking_type",
             "status",
@@ -262,12 +244,7 @@ class CategoryController extends Controller
         if ($request->has("name")) {
             $categoryName = trim($request->input("name"));
 
-            if (
-                CategoryModel::categoryNameExists(
-                    $categoryName,
-                    $categoryId
-                )
-            ) {
+            if (CategoryModel::categoryNameExists($categoryName, $categoryId)) {
                 return response()->json([
                     "result" => 0,
                     "msg" => "Category already exists. Please enter a unique Category name.",
@@ -306,22 +283,12 @@ class CategoryController extends Controller
             $categoryUpdate["name"] = $categoryName;
         }
 
-        if ($request->has("description")) {
-            $categoryUpdate["description"] = $request->input(
-                "description"
-            );
-        }
-
         if ($request->exists("image_url")) {
-            $categoryUpdate["image_url"] = $request->input(
-                "image_url"
-            );
+            $categoryUpdate["image_url"] = $request->input("image_url");
         }
 
         if ($request->has("booking_type")) {
-            $categoryUpdate["booking_type"] = $request->input(
-                "booking_type"
-            );
+            $categoryUpdate["booking_type"] = $request->input("booking_type");
         }
 
         if ($request->has("status")) {
@@ -354,8 +321,7 @@ class CategoryController extends Controller
         $adminId = $request->input("admin_id");
 
         if ($adminId) {
-            $updatedCategoryName =
-                $categoryUpdate["name"] ?? $category->name;
+            $updatedCategoryName = $categoryUpdate["name"] ?? $category->name;
 
             DB::table("activity_logs")->insert([
                 "admin_id" => $adminId,
