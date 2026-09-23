@@ -590,36 +590,40 @@ class SalonModel extends Model
         return $data;
     }
 	
-	public static function getCalenderBookingDetails($booking_id = null)
+    public static function getCalenderBookingDetails($booking_id = null)
     {
-		$query = DB::table('booking')
-			->select('*', 'salon_worker.worker_name', 'slots.slot_time')
-			->leftJoin('salon_worker', 'booking.worker_id', '=', 'salon_worker.worker_id')
-			->leftJoinSub(
-				DB::table('slots')->select('slot_id', 'slot_time'),
-				'slots',
-				function ($join) {
-					$join->on(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(booking.slots, '$[0]'))"), '=', 'slots.slot_id');
-				}
-			);
-		$services_taken = [];
-		$data = $query->where('booking.booking_id', '=', $booking_id)->where('booking.status', '=', 'Active')->get();
-		if ($data && isset($data->services) && !empty($data->services)) {
-			$service_ids = json_decode($data->services, true);
-			if (!empty($service_ids) && is_array($service_ids)) {
-				$valid_service_ids = array_filter($service_ids, function ($id) {
-					return is_numeric($id) && $id > 0;
-				});
-				if (!empty($valid_service_ids)) {
-					$services_taken = DB::table('services')
-						->whereIn('service_id', $valid_service_ids)
-						->pluck('service_name_en')
-						->toArray();
-				}
-			}
-		}
-		$data->services_taken = $services_taken;
-		return $data;
+        $query = DB::table('booking')->select('booking.*','salon_worker.worker_name','slots.slot_time')
+            ->leftJoin('salon_worker','booking.worker_id','=','salon_worker.worker_id')
+            ->leftJoinSub(DB::table('slots')->select('slot_id', 'slot_time'),'slots',
+            function ($join) {$join->on(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(booking.slots, '$[0]'))"),'=','slots.slot_id');}
+            );
+
+        $services_taken = [];
+
+        $data = $query->where('booking.booking_id', '=', $booking_id)->where('booking.status', '=', 'Active')->get();
+
+        if ($data && isset($data->services) && !empty($data->services)) {
+            $service_ids = json_decode($data->services, true);
+
+            if (!empty($service_ids) && is_array($service_ids)) {
+                $valid_service_ids = array_filter($service_ids, function ($id) {
+                    return is_numeric($id) && $id > 0;
+                });
+
+                if (!empty($valid_service_ids)) {
+                    $services_taken = DB::table('services')
+                        ->whereIn('service_id', $valid_service_ids)
+                        ->pluck('service_name_en')
+                        ->toArray();
+                }
+            }
+        }
+
+        if ($data) {
+            $data->services_taken = $services_taken;
+        }
+
+        return $data;
     }
 
 	public static function getUnAssignedBookings($keyword = null)
