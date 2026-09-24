@@ -2910,7 +2910,7 @@ class SalonController extends Controller
             $validator = Validator::make($request->all(), [
                 'salon_id' => 'required',
                 'customer_name' => 'required|string|max:48',
-                'booking_source' => 'required|string'
+                'visit_type' => 'required|string'
             ], [
                 'required' => 'This :attribute is Required',
                 'string' => 'The :attribute must be a string',
@@ -2991,7 +2991,7 @@ class SalonController extends Controller
             $category_id = $request->post('category_id');
             $visit_type = $request->post('visit_type');
             $worker_id = $request->post('worker_id');
-            $booking_source = $request->post('booking_source');
+            // $booking_source = $request->post('booking_source');
 
             $services_array = null;
 
@@ -3441,7 +3441,7 @@ class SalonController extends Controller
                         ? $request->post('secondary_lang')
                         : $oldbookingdata->secondary_lang,
 
-                    'booking_source' => $booking_source,
+                    // 'booking_source' => $booking_source,
 
                     'status' => 'Active',
                 ];
@@ -3546,7 +3546,7 @@ class SalonController extends Controller
                     'visit_type' => $visit_type,
                     'preferred_lang' => $request->post('preferred_lang'),
                     'secondary_lang' => $request->post('secondary_lang'),
-                    'booking_source' => $booking_source,
+                    // 'booking_source' => $booking_source,
                     'status' => 'Active',
                 ];
 
@@ -6038,12 +6038,12 @@ class SalonController extends Controller
                     'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'
                 ],
                 'worker_id' => 'nullable',
-                'booking_source' => 'nullable|string',
+                'visit_type' => 'nullable|string',
             ], [
                 'required' => 'The :attribute is required',
                 'booking_time.regex' => 'The booking time must be in 24-hour HH:mm format.',
                 'booking_date.date' => 'The booking date must be a valid date.',
-                'booking_source.string' => 'The booking source must be a string.',
+                'visit_type.string' => 'The visit type must be a string.',
             ]);
 
             if ($validator->fails()) {
@@ -6083,7 +6083,7 @@ class SalonController extends Controller
             $category_id = $request->input('category_id');
             $visit_type = $request->input('visit_type');
             $worker_id = $request->input('worker_id');
-            $booking_source = $request->input('booking_source');
+            // $booking_source = $request->input('booking_source');
 
             $booking_date = $request->input('booking_date');
             $booking_time = $request->input('booking_time');
@@ -6296,9 +6296,9 @@ class SalonController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            if ($request->has('booking_source')) {
-                $updateData['booking_source'] = $booking_source;
-            }
+            // if ($request->has('booking_source')) {
+            //     $updateData['booking_source'] = $booking_source;
+            // }
 
             /*
             |--------------------------------------------------------------------------
