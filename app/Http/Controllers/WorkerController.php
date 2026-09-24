@@ -48,7 +48,7 @@ class WorkerController extends Controller
             'worker_address' => $request->post('worker_address'),
             'job_title' => $request->post('job_title'),
             'service_id' => json_encode($request->post('service_id')),
-            'employment_status' => $request->post('employment_status'),
+            'employment_status' => $request->post('employment_status') ?? 'fulltime',
             'joining_date'=>$request->post('joining_date')
         ];
         
@@ -149,7 +149,7 @@ class WorkerController extends Controller
             'worker_address' => $request->post('worker_address'),
             'job_title' => $request->post('job_title'),
             'service_id' => json_encode($request->post('service_id')),
-            'employment_status' => $request->post('employment_status'),
+            'employment_status' => $request->post('employment_status') ?? 'fulltime',
         ];
         
         $result=WorkerModel::updateSalonWorker($update,$worker_id);
