@@ -457,7 +457,7 @@ class ServiceController extends Controller
 		]);
 	}
 	
-	public function deleteService(Request $request,$serviceId) 
+	public function deleteService(Request $request, $serviceId)
 	{
 		if (!is_numeric($serviceId) || (int) $serviceId <= 0) {
 			return response()->json([
@@ -481,6 +481,20 @@ class ServiceController extends Controller
 			return response()->json([
 				'result' => -1,
 				'msg' => 'Service is already inactive.',
+			]);
+		}
+
+		/*
+		* Check if the service is attached to any salons.
+		*/
+		$salonCount = DB::table('salon_services')
+			->where('service_id', $serviceId)
+			->count();
+
+		if ($salonCount > 0) {
+			return response()->json([
+				'result' => -1,
+				'msg' => "This service is already attached with {$salonCount} salons. Please make sure to remove those from there.",
 			]);
 		}
 
