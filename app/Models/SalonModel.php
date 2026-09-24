@@ -465,77 +465,124 @@ class SalonModel extends Model
         return $data;
     }
 	
-	public static function getBookingsV2($status = null, $salon_id = null, $visit_type = null, $booking_date = null, $keyword = null, $salons_ids = null, $worker_ids = null, $customer_ids = null, $type = null, $month = null, $year = null, $is_paginate = null, $user = null, $user_id = null)
-	{
-		$query = DB::table('booking')
-			->select(
-				'booking.booking_id',
-				'booking.booking_status',
+
+    public static function getBookingsV2($status = null, $salon_id = null, $visit_type = null, $booking_date = null,$keyword = null,$salons_ids = null,$worker_ids = null,$customer_ids = null, $type = null,$month = null,$year = null,$is_paginate = null,$user = null,$user_id = null)
+     {
+        $query = DB::table('booking')
+            ->select(
+                'booking.booking_id',
+                'booking.booking_status',
                 'booking.contact_no',
-				'booking.booking_date',
+                'booking.booking_date',
                 'booking.booking_time',
-				'booking.booking_for',
-				'booking.created_at',
-				'booking.visit_type',
-				'agreement.pathToSignature',
-				'agreement.pathToPDF',
-				'customers.customer_name',
-				'customers.email',
-				'customers.phone',
-				'salon.salon_name_en',
-				'salon.salon_id',
-				'salon.salon_thumbnail',
-				'salon_worker.worker_name',
-				'slots.slot_time'
-			)
-			->leftJoin('agreement', 'booking.booking_id', '=', 'agreement.booking_id')
-			->leftJoin('customers', 'booking.customer_id', '=', 'customers.customer_id')
-			->leftJoin('salon', 'booking.salon_id', '=', 'salon.salon_id')
-			->leftJoin('salon_worker', 'booking.worker_id', '=', 'salon_worker.worker_id')
-			->leftJoinSub(
-				DB::table('slots')->select('slot_id', 'slot_time'),
-				'slots',
-				function ($join) {
-					$join->on(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(booking.slots, '$[0]'))"), '=', 'slots.slot_id');
-				}
-			)
-			->where('booking.status', 'Active');
+                'booking.booking_for',
+                'booking.created_at',
+                'booking.visit_type',
+                'agreement.pathToSignature',
+                'agreement.pathToPDF',
+                'customers.customer_name',
+                'customers.email',
+                'customers.phone',
+                'salon.salon_name_en',
+                'salon.salon_id',
+                'salon.salon_thumbnail',
+                'salon_worker.worker_name',
+                'slots.slot_time'
+            )
+            ->leftJoin('agreement', 'booking.booking_id', '=', 'agreement.booking_id')
+            ->leftJoin('customers', 'booking.customer_id', '=', 'customers.customer_id')
+            ->leftJoin('salon', 'booking.salon_id', '=', 'salon.salon_id')
+            ->leftJoin('salon_worker', 'booking.worker_id', '=', 'salon_worker.worker_id')
+            ->leftJoinSub(
+                DB::table('slots')->select('slot_id', 'slot_time'),
+                'slots',
+                function ($join) {
+                    $join->on(
+                        DB::raw("JSON_UNQUOTE(JSON_EXTRACT(booking.slots, '$[0]'))"),
+                        '=',
+                        'slots.slot_id'
+                    );
+                }
+            )
+            ->where('booking.status', 'Active');
 
-            if (($user == 'subadmin') && ($user_id)) {
-			$manager = DB::table('admins')
-				->where('status', 'Active')
-				->where('admin_id', $user_id)
-				->first();
+        if (($user == 'subadmin') && ($user_id)) {
+            $manager = DB::table('admins')
+                ->where('status', 'Active')
+                ->where('admin_id', $user_id)
+                ->first();
 
-			if ($manager && !empty($manager->salons)) {
-				$salon_ids = json_decode($manager->salons, true);
-				if (!empty($salon_ids)) {
-					$query->whereIn('booking.salon_id', $salon_ids);
-				}
-			}
-		}
+            if ($manager && !empty($manager->salons)) {
+                $salon_ids = json_decode($manager->salons, true);
+
+                if (!empty($salon_ids)) {
+                    $query->whereIn('booking.salon_id', $salon_ids);
+                }
+            }
+        }
 
         if (!empty($keyword)) {
-			$query->where(function ($query) use ($keyword, $salons_ids, $worker_ids, $customer_ids) {
-				if (!empty($customer_ids)) $query->orWhereIn('booking.customer_id', $customer_ids);
-				if (!empty($salons_ids)) $query->orWhereIn('booking.salon_id', $salons_ids);
-				if (!empty($worker_ids)) $query->orWhereIn('booking.worker_id', $worker_ids);
-				$query->orWhere('booking.booking_for', 'LIKE', $keyword . '%');
+            $query->where(function ($query) use ($keyword, $salons_ids, $worker_ids, $customer_ids) {
+                if (!empty($customer_ids)) {
+                    $query->orWhereIn('booking.customer_id', $customer_ids);
+                }
+
+                if (!empty($salons_ids)) {
+                    $query->orWhereIn('booking.salon_id', $salons_ids);
+                }
+
+                if (!empty($worker_ids)) {
+                    $query->orWhereIn('booking.worker_id', $worker_ids);
+                }
+
+                $query->orWhere('booking.booking_for', 'LIKE', $keyword . '%');
                 $query->orWhere('booking.contact_no', 'LIKE', '%' . $keyword . '%');
-			});
-		}
+            });
+        }
 
-        if (!empty($status)) $query->where('booking.booking_status', $status);
-		if (!empty($visit_type)) $query->where('booking.visit_type', $visit_type);
-		if (!empty($booking_date)) $query->whereDate('booking.booking_date', $booking_date);
-		if (!empty($salon_id)) $query->where('booking.salon_id', $salon_id);
-		if (!empty($year)) $query->whereYear('booking.booking_date', $year);
-		if (!empty($month)) $query->whereMonth('booking.booking_date', $month);
+        if (!empty($status)) {
+            $query->where('booking.booking_status', $status);
+        }
 
-        $query->orderBy('booking.booking_date', 'desc');
+        if (!empty($visit_type)) {
+            $query->where('booking.visit_type', $visit_type);
+        }
 
-        return ($is_paginate != 'nopaginate') ? $query->paginate(10) : $query->get();
-	}
+        if (!empty($booking_date)) {
+            $query->whereDate('booking.booking_date', $booking_date);
+        }
+
+        if (!empty($salon_id)) {
+            $query->where('booking.salon_id', $salon_id);
+        }
+
+        if (!empty($year)) {
+            $query->whereYear('booking.booking_date', $year);
+        }
+
+        if (!empty($month)) {
+            $query->whereMonth('booking.booking_date', $month);
+        }
+
+        /*
+        * Sorting:
+        * filter=recent -> newest bookings based on created_at
+        * no filter    -> existing booking_date sorting
+        */
+        if ($type === 'recent') {
+            $query->orderBy('booking.created_at', 'desc');
+        } else {
+            $query->orderBy('booking.booking_date', 'desc');
+        }
+
+        /*
+        * Pagination remains unchanged.
+        */
+        return ($is_paginate != 'nopaginate')
+            ? $query->paginate(10)
+            : $query->get();
+    }
+
 	
 	public static function getCalenderBookings($salon_id = null, $month = null, $year = null, $is_paginate = null, $booking_date = null)
     {
