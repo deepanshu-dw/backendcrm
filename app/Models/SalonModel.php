@@ -277,6 +277,8 @@ class SalonModel extends Model
                     'service_name_en as service_name',
                     "service_description_en as description",
                     "price_$lang as price",
+                    "price_type",
+                    "price_note",
                     "customer_name_$lang as customer_facing_name",
                     'service_time_taken',
                     'is_hair_extension',

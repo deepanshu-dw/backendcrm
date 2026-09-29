@@ -1373,22 +1373,10 @@ class SalonController extends Controller
             /*
             * Keep old services response.
             */
-            $serviceIds =
-                SalonModel::getSalonServiceIds(
-                    $salon_id
-                )
-                ->map(function ($serviceId) {
-                    return (int) $serviceId;
-                })
-                ->toArray();
+            $serviceIds = SalonModel::getSalonServiceIds($salon_id)->map(function ($serviceId) {return (int) $serviceId;})->toArray();
 
 
-            $result->services =
-                SalonModel::getServices(
-                    $serviceIds,
-                    $lang,
-                    $isAdmin
-                );
+            $result->services = SalonModel::getServices($serviceIds, $lang, $isAdmin);
 
 
             /*
